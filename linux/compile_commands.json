@@ -1,0 +1,19 @@
+[
+  {
+    "file": "src/node/main.cpp",
+    "arguments": [
+      "g++",
+      "-std=c++23",
+      "-Wall",
+      "-g",
+      "-Iinclude",
+      "-I../common/include",
+      "-c",
+      "src/node/main.cpp",
+      "-o",
+      "build/node/objs/main.o"
+    ],
+    "directory": "/home/hoothoot/Programming/Projects/comtek_p4/linux",
+    "output": "build/node/objs/main.o"
+  }
+]
