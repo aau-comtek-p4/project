@@ -1,0 +1,9 @@
+CompileFlags:
+  CompilationDatabase: build/
+  Remove:
+    - -mnlongcalls
+    - -fstrict-volatile-bitfields
+    - -fno-tree-switch-conversion
+    - -mtext-section-literals
+    - -mlongcalls
+    - -fno-shrink-wrap
