@@ -9,8 +9,8 @@
 #include <utility>
 template <typename T> class QueueInterface {
 public:
-  virtual std::expected<void, CapacityError> enque(T &&val) = 0;
-  virtual std::expected<T *, CapacityError> deque() = 0;
+  virtual std::expected<void, int> enque(T &&val) = 0;
+  virtual std::expected<T *, int> deque() = 0;
 };
 
 template <typename T, size_t queue_size>
@@ -22,7 +22,7 @@ private:
   size_t queue_items = 0;
 
 public:
-  std::expected<void, CapacityError> enque(T &&val) override {
+  std::expected<void, int> enque(T &&val) override {
     if (queue_items >= queue_size) {
       return std::unexpected(CapacityError::INSUFFICIENT_SPACE);
     }
@@ -50,7 +50,7 @@ private:
   size_t queue_items = 0;
 
 public:
-  std::expected<void, CapacityError> enque(std::coroutine_handle<> &&val) {
+  std::expected<void, int> enque(std::coroutine_handle<> &&val) {
     if (queue_items >= queue_size) {
       return std::unexpected(CapacityError::INSUFFICIENT_SPACE);
     }
@@ -58,7 +58,7 @@ public:
     tail = (tail + 1) % queue_size;
     queue_items += 1;
   };
-  std::expected<std::coroutine_handle<> *, CapacityError> deque() {
+  std::expected<std::coroutine_handle<> *, int> deque() {
     if (queue_items <= 0) {
       return std::unexpected(CapacityError::BUFFER_UNDERFLOW);
     }

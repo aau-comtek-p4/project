@@ -2,6 +2,7 @@
 #include "general/interfaces/utility/clock.h"
 #include <algorithm>
 #include <cstdint>
+
 #include <ctime>
 #include <format>
 uint64_t now_ns(clockid_t clock_id) {
@@ -11,7 +12,9 @@ uint64_t now_ns(clockid_t clock_id) {
 }
 
 BasickClock::BasickClock(clockid_t clock_id, uint64_t tick_ns)
-    : tick_ns(tick_ns), clock_id(clock_id) {};
+    : tick_ns(tick_ns), clock_id(clock_id) {
+  this->start_ns = now_ns(clock_id);
+};
 void BasickClock::tick() { this->tick_count += 1; };
 uint64_t BasickClock::rt_now() { return now_ns(this->clock_id); };
 uint64_t BasickClock::tick_now() { return this->tick_count; };
@@ -30,14 +33,19 @@ uint64_t BasickClock::spin_untill_future() {
   return now;
 };
 TimeStamp BasickClock::format_time() {
-  uint64_t time_ns = this->rt_now();
+  uint64_t time_ns = this->rt_now() - this->start_ns;
   uint64_t time_ms = time_ns / NS_PR_MS;
   uint64_t time_s = time_ms / MS_PR_S;
   uint64_t time_m = time_s / S_PR_M;
   uint64_t time_h = time_m / M_PR_H;
 
   TimeStamp time_stamp{
-      .time_ns = time_ns, .time_s = time_s, .time_m = time_m, .time_h = time_h};
+      .time_ns = time_ns,
+      .time_ms = time_ms,
+      .time_s = time_s,
+      .time_m = time_m,
+      .time_h = time_h,
+  };
 
   return time_stamp;
-};
+}

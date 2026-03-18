@@ -1,14 +1,18 @@
 #include "common/utility/clocks/basic_clock.h"
 #include "common/utility/loggers/fprint_logger.h"
+#include "general/common.h"
+#include "general/interfaces/storage/allocators/bucket_allocator.h"
 #include "general/interfaces/utility/clock.h"
 #include "general/interfaces/utility/logger.h"
-#include <cstdarg>
+#include <coroutine>
 #include <cstdint>
-#include <cstdio>
 #include <ctime>
+#include <liburing.h>
+#include <unistd.h>
 
 int main() {
-  BasickClock basic_clock(CLOCK_MONOTONIC, 10000000);
-  FPrintLogger logger(&basic_clock);
-  logger.log_err("TAG", "Hello %s age %u", "Jhon", 35);
+  BasickClock basic_clock(CLOCK_MONOTONIC, NS_PR_MS * 10);
+  tl_clock = &basic_clock;
+  FPrintLogger logger;
+  tl_logger = &logger;
 }

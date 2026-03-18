@@ -3,6 +3,7 @@
 
 #include "general/interfaces/utility/clock.h"
 #include <bits/types/clockid_t.h>
+#include <cstddef>
 #include <cstdint>
 
 class BasickClock : public ClockInterface {
@@ -11,6 +12,7 @@ private:
   uint64_t future_time = 0;
   uint64_t tick_ns;
   clockid_t clock_id;
+  uint64_t start_ns;
 
 public:
   BasickClock(clockid_t clock_id, uint64_t tick_ns);
