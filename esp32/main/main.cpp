@@ -2,6 +2,13 @@
 #include "esp_https_ota.h"
 #include "nvs_flash.h"
 
+#include <cstdio>
+#include <expected>
+
+#include <optional>
+
+std::optional<int> a = 5;
+
 extern "C" void app_main(void) {
 
   esp_err_t ret = nvs_flash_init();
@@ -11,6 +18,4 @@ extern "C" void app_main(void) {
     ret = nvs_flash_init();
   }
   ESP_ERROR_CHECK(ret);
-
-  esp_https_ota_config_t lul = {};
 }

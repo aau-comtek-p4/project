@@ -4,7 +4,7 @@ CPP = g++
 LOCAL_INC_DIR= include
 GENERAL_INC_DIR= ../common/include
 
-CPP_FLAGS = -std=c++23 -Wall -g -I$(LOCAL_INC_DIR) -I$(GENERAL_INC_DIR)
+CPP_FLAGS = -std=c++23 -Wall -g -I$(LOCAL_INC_DIR) -I$(GENERAL_INC_DIR) -luring -fcoroutines
 
 SRC_DIR = src
 

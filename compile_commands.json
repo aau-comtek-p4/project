@@ -8,6 +8,7 @@
       "-g",
       "-Iinclude",
       "-I../common/include",
+      "-fcoroutines",
       "-c",
       "src/server/main.cpp",
       "-o",
