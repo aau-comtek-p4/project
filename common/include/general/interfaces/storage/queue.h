@@ -1,12 +1,17 @@
 #ifndef QUEUE_INTERFACE_H
 #define QUEUE_INTERFACE_H
 
+#include "general/common.h"
 #include "general/misc/errors.h"
 #include <cassert>
 #include <coroutine>
 #include <cstddef>
 #include <expected>
 #include <utility>
+
+#define QUEUE_TAG "QUEUE"
+#define QUEUE_ERR_TAG "QUEUE ERR"
+
 template <typename T> class QueueInterface {
 public:
   virtual std::expected<void, int> enque(T &&val) = 0;
@@ -29,8 +34,9 @@ public:
     storage[tail] = std::move(val);
     tail = (tail + 1) % queue_size;
     queue_items += 1;
+    return {};
   };
-  std::expected<T *, CapacityError> deque() override {
+  std::expected<T *, int> deque() override {
     if (queue_items <= 0) {
       return std::unexpected(CapacityError::BUFFER_UNDERFLOW);
     }
@@ -40,33 +46,4 @@ public:
     return ptr;
   }
 };
-
-template <size_t queue_size>
-class CoRoutineQueue : public QueueInterface<std::coroutine_handle<>> {
-private:
-  std::coroutine_handle<> storage[queue_size];
-  size_t head = 0;
-  size_t tail = 0;
-  size_t queue_items = 0;
-
-public:
-  std::expected<void, int> enque(std::coroutine_handle<> &&val) {
-    if (queue_items >= queue_size) {
-      return std::unexpected(CapacityError::INSUFFICIENT_SPACE);
-    }
-    storage[tail] = std::move(val);
-    tail = (tail + 1) % queue_size;
-    queue_items += 1;
-  };
-  std::expected<std::coroutine_handle<> *, int> deque() {
-    if (queue_items <= 0) {
-      return std::unexpected(CapacityError::BUFFER_UNDERFLOW);
-    }
-    std::coroutine_handle<> *ptr = &storage[head];
-    head = (head + 1) % queue_size;
-    queue_items -= 1;
-    return ptr;
-  }
-};
-
 #endif

@@ -1,0 +1,75 @@
+#include "general/interfaces/event_loop/event_loops/basic_event_loop.h"
+#include "general/common.h"
+#include "general/interfaces/event_loop/event_loop.h"
+#include "general/misc/errors.h"
+#include <utility>
+
+BasicEventLoop::BasicEventLoop(
+    QueueInterface<std::coroutine_handle<>> *ready_queue,
+    QueueInterface<std::coroutine_handle<>> *staging_queue,
+    AllocatorInterface *coroutine_generator_allocator)
+    : ready_queue(ready_queue), staging_queue(staging_queue),
+      coroutine_generator_allocator(coroutine_generator_allocator) {}
+
+std::expected<void *, int> BasicEventLoop::allocate(size_t n) {
+  auto res = this->coroutine_generator_allocator->allocate(n);
+  if (res.has_value()) {
+    return res.value();
+  }
+  tl_logger->log_err(
+      EVENT_LOOP_ERR_TAG,
+      "Failed to allocate space for coroutine generator, received err: [%s]",
+      custom_strerror(res.error()));
+  return std::unexpected(res.error());
+};
+
+std::expected<void, int> BasicEventLoop::enque(std::coroutine_handle<> handle) {
+  auto res = this->ready_queue->enque(std::move(handle));
+  if (res.has_value()) {
+    return {};
+  }
+  tl_logger->log_err(
+      EVENT_LOOP_ERR_TAG,
+      "Failed to enque co routine handle to ready queue, received err: [%s]",
+      custom_strerror(res.error()));
+  return std::unexpected(res.error());
+};
+std::expected<void, int>
+BasicEventLoop::enque_staging(std::coroutine_handle<> handle) {
+  auto res = this->staging_queue->enque(std::move(handle));
+  if (res.has_value()) {
+    return {};
+  }
+  tl_logger->log_err(
+      EVENT_LOOP_ERR_TAG,
+      "Failed to enque co routine handle to staging queue, received err: [%s]",
+      custom_strerror(res.error()));
+  return std::unexpected(res.error());
+};
+
+std::expected<void, int> BasicEventLoop::step() {
+
+  std::swap(this->ready_queue, this->staging_queue);
+  auto get_head_handle_res = this->ready_queue->deque();
+  while (get_head_handle_res.has_value()) {
+    std::coroutine_handle<> *handler = get_head_handle_res.value();
+    if (handler) {
+      if (!handler->done()) {
+        handler->resume();
+      }
+    } else {
+      tl_logger->log_debug(EVENT_LOOP_TAG, "NULL handle");
+    }
+
+    get_head_handle_res = this->ready_queue->deque();
+  }
+  return {};
+}
+
+std::expected<void, int> BasicEventLoop::run() {
+  while (true) {
+    auto res = this->step();
+    if (!res.has_value()) {
+    }
+  }
+};

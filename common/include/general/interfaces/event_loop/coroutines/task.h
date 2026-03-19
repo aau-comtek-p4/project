@@ -5,6 +5,7 @@
 #include "general/interfaces/event_loop/co_routine.h"
 #include "general/interfaces/storage/allocator.h"
 #include "general/misc/errors.h"
+#include "general/misc/shutdown.h"
 #include <cassert>
 #include <coroutine>
 #include <cstddef>
@@ -19,7 +20,7 @@ public:
   struct promise_type;
   using handle_type = std::coroutine_handle<promise_type>;
   handle_type handle;
-  explicit Task(handle_type h);
+  explicit Task(handle_type h) : handle(h) {};
   ~Task();
   bool await_ready();
 
@@ -44,9 +45,8 @@ bool Task<T>::await_ready() {
 template <typename T>
 template <typename U>
 std::coroutine_handle<>
-
 Task<T>::await_suspend(std::coroutine_handle<U> caller) {
-  this->handle.promise().continuation = caller.promise();
+  this->handle.promise().continuation = caller;
   return this->handle;
 }
 
@@ -89,7 +89,7 @@ template <typename T> struct Task<T>::promise_type {
       if (!continuation_handler) {
         return;
       }
-      auto res = tl_loop->enque(continuation_handler);
+      auto res = tl_loop->enque_staging(continuation_handler);
       if (res.has_value()) {
         return;
       }
@@ -137,7 +137,7 @@ template <typename T> struct Task<T>::promise_type {
           custom_strerror(res.error()));
       safe_shutdown(res.error());
     }
-    tl_logger->log_info(
+    tl_logger->log_debug(
         COROUTINE_TAG, "Created new task id [%lu], space required: [%lu] bytes",
         total_coroutine_counter, n);
     return res.value();
@@ -152,7 +152,7 @@ template <typename T> struct Task<T>::promise_type {
     tl_logger->log_err(COROUTINE_ERR_TAG,
                        "Task failed to free itself via frame "
                        "allocator, got error: [%s]",
-                       strerror(res.error()));
+                       custom_strerror(res.error()));
     safe_shutdown(res.error());
   }
 };

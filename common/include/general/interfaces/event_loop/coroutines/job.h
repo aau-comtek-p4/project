@@ -4,23 +4,31 @@
 #include "general/interfaces/event_loop/co_routine.h"
 #include "general/interfaces/event_loop/event_loop.h"
 #include "general/misc/errors.h"
+#include "general/misc/shutdown.h"
 #include <coroutine>
 #include <expected>
 #include <system_error>
-template <typename T>
-std::expected<void, int> spawn(EventloopInterface *loop, T &&routine) {
+template <typename T> std::expected<void, int> spawn(T &&routine) {
 
-  std::coroutine_handle<> handle = routine.get_handle();
-  auto ptr = (T *)loop->allocate(sizeof(T));
+  std::coroutine_handle<> handle = routine.handle;
+  auto res = tl_loop->allocate(sizeof(T));
+  if (!res.has_value()) {
+    tl_logger->log_err(EVENT_LOOP_ERR_TAG,
+                       "In spawn failed to allocate enough space for coroutine "
+                       "generator, error: [%s]",
+                       custom_strerror(res.error()));
+    return std::unexpected(res.error());
+  }
+  T *ptr = (T *)res.value();
   ptr[0] = std::move(routine);
-  auto res = loop->enque_staging(std::move(handle));
-  if (res.has_value()) {
+  auto enqueue_res = tl_loop->enque_staging(std::move(handle));
+  if (enqueue_res.has_value()) {
     return {};
   }
   tl_logger->log_err(EVENT_LOOP_ERR_TAG,
                      "Failed to spawn co routine, received error: [%s]",
-                     custom_strerror(res.error()));
-  return std::unexpected(res.error());
+                     custom_strerror(enqueue_res.error()));
+  return std::unexpected(enqueue_res.error());
 }
 
 class Job {
@@ -35,27 +43,9 @@ public:
   Job(Job &&other);
   Job &operator=(Job &&other);
 };
-Job::~Job() {
-  if (this->handle) {
-    handle.destroy();
-  }
-}
-Job::Job(Job &&other) : handle(other.handle) {
-  other.handle = nullptr; // prevent double destroy
-}
-
-Job &Job::operator=(Job &&other) {
-  if (this != &other) {
-    if (handle)
-      handle.destroy();
-    handle = other.handle;
-    other.handle = nullptr;
-  }
-  return *this;
-}
 
 struct Job::promise_type {
-  int error_type = NULL;
+  int error_type = 0;
   size_t id;
   promise_type() {
     id = total_coroutine_counter;
@@ -94,8 +84,8 @@ struct Job::promise_type {
           custom_strerror(res.error()));
       safe_shutdown(res.error());
     }
-    tl_logger->log_info(
-        COROUTINE_TAG, "Created new task id [%lu], space required: [%lu] bytes",
+    tl_logger->log_debug(
+        COROUTINE_TAG, "Created job task id [%lu], space required: [%lu] bytes",
         total_coroutine_counter, n);
     return res.value();
   }
@@ -113,5 +103,8 @@ struct Job::promise_type {
     safe_shutdown(res.error());
   }
 };
+Job keep_printing_boy();
+
+Job keep_printing_boy2();
 
 #endif

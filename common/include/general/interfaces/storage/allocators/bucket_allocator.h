@@ -89,7 +89,8 @@ BucketAllocator<bucket_count, bucket_size>::allocate(size_t n) {
 
   this->free_bucket_header_ptr = current_bucket_index->next_ptr;
   this->used_memory += n;
-  tl_logger->log_info(ALLOCATOR_TAG, "Allocated bucet, ussed bytes; [%lu]", n);
+  tl_logger->log_debug(ALLOCATOR_TAG, "Allocated bucket, ussed bytes; [%lu]",
+                       n);
   return current_bucket_index;
 }
 
@@ -102,8 +103,10 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
                        "Attempt to free when none allocated");
     return std::unexpected(CapacityError::BUFFER_UNDERFLOW);
   }
-  bool ptr_in_range =
-      bucket_ptr >= this->buffer && bucket_ptr <= (this->buffer + bucket_count);
+  auto start = reinterpret_cast<std::byte *>(this->buffer);
+  auto end = start + bucket_count * sizeof(Bucket<bucket_size>);
+  auto ptr = reinterpret_cast<std::byte *>(bucket_ptr);
+  bool ptr_in_range = ptr >= start && ptr < end;
 
   if (!ptr_in_range) {
     tl_logger->log_err(ALLOCATOR_ERROR_TAG,
@@ -111,10 +114,15 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
     return std::unexpected(CapacityError::OUTSIDE_RANGE);
   }
 
-  auto cur_bucket_ptr = (Bucket<bucket_size> *)bucket_ptr;
-  if ((cur_bucket_ptr - this->buffer) % sizeof(Bucket<bucket_size>) != 0) {
-    tl_logger->log_err(ALLOCATOR_ERROR_TAG,
-                       "Attempt to free address not aligned with bucket");
+  auto cur_bucket_ptr = reinterpret_cast<Bucket<bucket_size> *>(bucket_ptr);
+  size_t offset = (reinterpret_cast<std::byte *>(cur_bucket_ptr) -
+                   reinterpret_cast<std::byte *>(this->buffer)) %
+                  sizeof(Bucket<bucket_size>);
+  if (offset != 0) {
+    tl_logger->log_err(
+        ALLOCATOR_ERROR_TAG,
+        "Attempt to free address not aligned with bucket, offset: [%lu]",
+        offset);
     return std::unexpected(CapacityError::OUTSIDE_RANGE);
   }
   size_t used_memory = cur_bucket_ptr->allocation_size;
@@ -124,8 +132,8 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
   this->allocated_buckets_count -= 1;
   cur_bucket_ptr->allocation_size = 0;
   this->used_memory -= used_memory;
-  tl_logger->log_info(ALLOCATOR_TAG, "Freed bucket, freed bytes: [%lu]",
-                      used_memory);
+  tl_logger->log_debug(ALLOCATOR_TAG, "Freed bucket, freed bytes: [%lu]",
+                       used_memory);
   return {};
 }
 

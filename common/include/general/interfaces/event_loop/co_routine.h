@@ -3,7 +3,7 @@
 #include <coroutine>
 
 #define COROUTINE_TAG "COROUTINE"
-#define COROUTINE_ERR_TAG "COROUTINE ERR"
+#define COROUTINE_ERR_TAG "COROUTINE ERROR"
 
 struct CoRoutineInterface {
 public:

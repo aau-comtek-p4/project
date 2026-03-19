@@ -11,6 +11,8 @@
 #define LOG_INFO_TEXT "INFO"
 #define LOG_ERROR_TEXT "ERROR"
 
+#define DEBUG_ON 1
+
 class LoggerInterface {
 public:
   virtual __attribute__((format(printf, 3, 4))) void
