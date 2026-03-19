@@ -51,6 +51,9 @@ FPrintLogger::log_info(const char *tag, const char *fmt, ...) noexcept {
 
 __attribute__((format(printf, 3, 4))) void
 FPrintLogger::log_debug(const char *tag, const char *fmt, ...) noexcept {
+  if (!DEBUG_ON) {
+    return;
+  }
   va_list args;
   va_start(args, fmt);
   this->log_general_v(LOG_DEBUG_PREFIX, LOG_DEBUG_TEXT, tag, stdout, fmt, args);
