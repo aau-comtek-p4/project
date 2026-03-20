@@ -5,6 +5,10 @@
 #define COROUTINE_TAG "COROUTINE"
 #define COROUTINE_ERR_TAG "COROUTINE ERROR"
 
+struct countable_promise_type {
+  bool cancelled = false;
+};
+
 struct CoRoutineInterface {
 public:
   struct promise_type;

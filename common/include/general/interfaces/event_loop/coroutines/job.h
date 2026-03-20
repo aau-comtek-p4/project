@@ -6,6 +6,7 @@
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
 #include <coroutine>
+#include <cstdint>
 #include <expected>
 #include <system_error>
 template <typename T> std::expected<void, int> spawn(T &&routine) {
@@ -31,6 +32,33 @@ template <typename T> std::expected<void, int> spawn(T &&routine) {
   return std::unexpected(enqueue_res.error());
 }
 
+template <typename T>
+std::expected<void, int> spawn_future(T &&routine,
+                                      uint64_t future_tick_offset) {
+
+  std::coroutine_handle<> handle = routine.handle;
+  auto res = tl_loop->allocate(sizeof(T));
+  if (!res.has_value()) {
+    tl_logger->log_err(
+        EVENT_LOOP_ERR_TAG,
+        "In set future failed to allocate enough space for coroutine "
+        "generator, error: [%s]",
+        custom_strerror(res.error()));
+    return std::unexpected(res.error());
+  }
+  T *ptr = (T *)res.value();
+  ptr[0] = std::move(routine);
+  auto set_future_res =
+      tl_loop->set_future(std::move(handle), future_tick_offset);
+  if (set_future_res.has_value()) {
+    return {};
+  }
+  tl_logger->log_err(EVENT_LOOP_ERR_TAG,
+                     "Failed to set future co routine, received error: [%s]",
+                     custom_strerror(set_future_res.error()));
+  return std::unexpected(set_future_res.error());
+}
+
 class Job {
 public:
   struct promise_type;
@@ -44,7 +72,7 @@ public:
   Job &operator=(Job &&other);
 };
 
-struct Job::promise_type {
+struct Job::promise_type : public countable_promise_type {
   int error_type = 0;
   size_t id;
   promise_type() {
@@ -103,8 +131,5 @@ struct Job::promise_type {
     safe_shutdown(res.error());
   }
 };
-Job keep_printing_boy();
-
-Job keep_printing_boy2();
 
 #endif

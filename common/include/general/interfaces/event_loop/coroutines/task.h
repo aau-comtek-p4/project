@@ -72,7 +72,8 @@ template <typename T> Task<T> &Task<T>::operator=(Task &&other) {
   return *this;
 }
 
-template <typename T> struct Task<T>::promise_type {
+template <typename T>
+struct Task<T>::promise_type : public countable_promise_type {
   std::expected<T, int> result;
   size_t id;
   std::coroutine_handle<> continuation = nullptr;

@@ -20,6 +20,9 @@ public:
   std::expected<void, int> enque(std::coroutine_handle<> handle) override;
   std::expected<void, int>
   enque_staging(std::coroutine_handle<> handle) override;
+
+  std::expected<void, int> set_future(std::coroutine_handle<> handle,
+                                      uint64_t future_tick) override;
   std::expected<void, int> step() override;
   std::expected<void, int> run() override;
 };

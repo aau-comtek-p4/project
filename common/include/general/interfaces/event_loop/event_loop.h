@@ -16,6 +16,9 @@ public:
   virtual std::expected<void, int>
   enque_staging(std::coroutine_handle<> handle) = 0;
 
+  virtual std::expected<void, int> set_future(std::coroutine_handle<> handle,
+                                              uint64_t future_tick) = 0;
+
   virtual std::expected<void, int> step() = 0;
   virtual std::expected<void, int> run() = 0;
 };

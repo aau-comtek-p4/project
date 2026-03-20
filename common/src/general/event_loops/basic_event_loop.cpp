@@ -2,6 +2,7 @@
 #include "general/common.h"
 #include "general/interfaces/event_loop/event_loop.h"
 #include "general/misc/errors.h"
+#include <cstdint>
 #include <utility>
 
 BasicEventLoop::BasicEventLoop(
@@ -47,6 +48,23 @@ BasicEventLoop::enque_staging(std::coroutine_handle<> handle) {
   return std::unexpected(res.error());
 };
 
+std::expected<void, int>
+BasicEventLoop::set_future(std::coroutine_handle<> handle,
+                           uint64_t future_tick) {
+
+  tl_logger->log_debug(EVENT_LOOP_TAG, "Adding node to wheel");
+  auto res = tl_deadline_keeper->add_deadline(std::move(handle), future_tick);
+  tl_logger->log_debug(EVENT_LOOP_TAG, "Added node to wheel");
+  if (res.has_value()) {
+    return {};
+  }
+  tl_logger->log_err(
+      EVENT_LOOP_ERR_TAG,
+      "Failed to enque future co routine handle to wheel, received err: [%s]",
+      custom_strerror(res.error()));
+  return std::unexpected(res.error());
+}
+
 std::expected<void, int> BasicEventLoop::step() {
 
   std::swap(this->ready_queue, this->staging_queue);
@@ -63,6 +81,11 @@ std::expected<void, int> BasicEventLoop::step() {
 
     get_head_handle_res = this->ready_queue->deque();
   }
+
+  auto res = tl_deadline_keeper->enforce_deadlines();
+  uint64_t tick_start = tl_clock->spin_untill_future();
+  tl_clock->tick();
+  tl_clock->set_future_tick(tick_start);
   return {};
 }
 

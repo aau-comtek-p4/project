@@ -23,33 +23,3 @@ Job &Job::operator=(Job &&other) {
   }
   return *this;
 }
-
-class AwaitNothing {
-public:
-  bool await_ready() { return false; }
-  void await_suspend(std::coroutine_handle<> h) {
-    auto res = tl_loop->enque_staging(std::move(h));
-    if (res.has_value()) {
-      return;
-    }
-    tl_logger->log_err("MAIN", "Failed to enque staging, err: [%s]",
-                       custom_strerror(res.error()));
-    return;
-  }
-  void await_resume() {}
-};
-Task<int> await_nothing() { co_return 1; }
-
-Job keep_printing_boy() {
-  while (true) {
-    tl_logger->log_info("MAIN", "Do be printing");
-    co_await await_nothing();
-  }
-}
-
-Job keep_printing_boy2() {
-  while (true) {
-    tl_logger->log_info("MAIN", "Do be printing, but cooler");
-    co_await await_nothing();
-  }
-}
