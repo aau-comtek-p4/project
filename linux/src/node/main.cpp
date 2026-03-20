@@ -16,10 +16,12 @@
 #include "general/misc/errors.h"
 #include <chrono>
 #include <coroutine>
+#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
+#include <expected>
 #include <liburing.h>
 #include <thread>
 #include <unistd.h>
@@ -46,22 +48,67 @@ Job print_interval(const char *text, uint64_t interval) {
     i++;
   }
 }
-template <typename T> class TimeoutAwaiter {
-  uint64_t timeout;
+
+template <typename T> struct TimeoutAwaiter {
   T routine;
-  TimeoutAwaiter(uint64_t timeout) : timeout(timeout) {}
-  void await_ready() { return; }
+  uint64_t timeout;
+  using promise_type = T::promise_type;
+  using return_type = std::expected<typename T::value_type, int>;
+  std::coroutine_handle<promise_type> routine_handler;
+  DeadlineIndexKeeper *deadline_index;
+  TimeoutAwaiter(T &&routine, uint64_t timeout)
+      : routine(std::move(routine)), timeout(timeout) {}
+
+  bool await_ready() { return false; }
   void await_suspend(std::coroutine_handle<> h) {
-    auto _ = tl_loop->allocate(sizeof(T));
-    // tl_deadline_keeper->add_deadline(h, this->timeout);
+    this->routine_handler = routine.handle;
+    this->routine_handler.promise().continuation = h;
+    spawn(std::move(routine));
+    auto res = tl_deadline_keeper->add_deadline(h, this->timeout);
+    if (!res.has_value()) {
+      tl_logger->log_err(COROUTINE_TAG, "Failed to add deadline, error: [%s]",
+                         custom_strerror(res.error()));
+    }
+    this->deadline_index = res.value();
+  }
+
+  return_type await_resume() {
+    if (this->routine_handler.done()) {
+      this->deadline_index->cancelled = true;
+      return this->routine_handler.promise().result;
+    }
+    this->routine_handler.promise().cancelled = true;
+    return std::unexpected(TimeoutError::OPERATION_TIMEOUT);
   }
 };
+template <typename T>
+TimeoutAwaiter<T> wait_for(T &&routine, uint64_t timeout) {
+  return TimeoutAwaiter<T>(std::move(routine), timeout);
+}
+
+Task<int> do_nothing() { co_return 0; }
+
+Task<int> nada(int a) {
+  // co_await SkipAwaiter(200);
+  tl_logger->log_info(COROUTINE_TAG, "I HAS RETURNED!!!");
+
+  co_return a * 2;
+}
 
 Task<int> async_print(const char *text) {
 
   tl_logger->log_info(COROUTINE_TAG, "%s, %u", text, 1);
   co_await SkipAwaiter(2000);
   tl_logger->log_info(COROUTINE_TAG, "%s, %u", text, 2);
+  auto val = co_await wait_for(nada(22), 200);
+  if (!val.has_value()) {
+    tl_logger->log_err(COROUTINE_ERR_TAG, "Got error on return: %s",
+                       custom_strerror(val.error()));
+    co_return 1;
+  }
+
+  tl_logger->log_info(COROUTINE_TAG, "Got val: %u", val.value());
+  ;
   co_return 1;
 }
 
@@ -83,7 +130,10 @@ int main() {
                                    &loop_generator_allocator);
   tl_loop = &loop;
   Deadline deadline_buffer[20];
-  DeadlineMinHeap deadline_keeper(deadline_buffer, 20);
+  Bucket<1> deadline_index_buffer[20] = {};
+  BucketAllocator<20, 1> deadline_index_allocator(deadline_index_buffer);
+  DeadlineMinHeap deadline_keeper(deadline_buffer, 20,
+                                  &deadline_index_allocator);
   tl_deadline_keeper = &deadline_keeper;
   auto _ = spawn_future(async_print("Hello sir"), 1210);
   _ = spawn_future(async_print("Hello sir"), 1210);

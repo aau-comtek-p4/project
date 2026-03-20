@@ -78,7 +78,7 @@ BucketAllocator<bucket_count, bucket_size>::allocate(size_t n) {
   assert(n <= bucket_size);
   if (this->free_bucket_header_ptr == nullptr) {
     tl_logger->log_err(ALLOCATOR_ERROR_TAG,
-                       "Attempt to free when no more buckets");
+                       "Attempt to allocate when no more buckets");
     return std::unexpected(CapacityError::INSUFFICIENT_SPACE);
   }
   assert((this->used_memory + n) <= this->total_memory);

@@ -17,6 +17,7 @@
 
 template <typename T> class Task {
 public:
+  using value_type = T;
   struct promise_type;
   using handle_type = std::coroutine_handle<promise_type>;
   handle_type handle;
@@ -73,7 +74,7 @@ template <typename T> Task<T> &Task<T>::operator=(Task &&other) {
 }
 
 template <typename T>
-struct Task<T>::promise_type : public countable_promise_type {
+struct Task<T>::promise_type : public shared_promise_type {
   std::expected<T, int> result;
   size_t id;
   std::coroutine_handle<> continuation = nullptr;
@@ -87,7 +88,7 @@ struct Task<T>::promise_type : public countable_promise_type {
     await_suspend(std::coroutine_handle<promise_type> own_handler) noexcept {
       std::coroutine_handle<> continuation_handler =
           own_handler.promise().continuation;
-      if (!continuation_handler) {
+      if (!continuation_handler || own_handler.promise().cancelled) {
         return;
       }
       auto res = tl_loop->enque_staging(continuation_handler);
@@ -98,7 +99,6 @@ struct Task<T>::promise_type : public countable_promise_type {
           COROUTINE_ERR_TAG,
           "Task id [%lu] failed to enque continuation, received error [%s]",
           own_handler.promise().id, custom_strerror(res.error()));
-      own_handler.promise().result = std::unexpected(res.error());
     }
     void await_resume() noexcept {}
   };

@@ -72,7 +72,7 @@ public:
   Job &operator=(Job &&other);
 };
 
-struct Job::promise_type : public countable_promise_type {
+struct Job::promise_type : public shared_promise_type {
   int error_type = 0;
   size_t id;
   promise_type() {

@@ -2,16 +2,16 @@
 #define LOGGER_INTERFACE_H
 
 #define LOG_WARNING_PREFIX "\033[33m"
-#define LOG_DEBUG_PREFIX "\033[34m"
+#define LOG_DEBUG_PREFIX "\033[38;2;124;159;255m"
 #define LOG_INFO_PREFIX "\033[37m"
-#define LOG_ERROR_PREFIX "\033[31m"
+#define LOG_ERROR_PREFIX "\033[38;2;255;21;60m"
 
 #define LOG_WARNING_TEXT "WARNING"
 #define LOG_DEBUG_TEXT "DEBUG"
 #define LOG_INFO_TEXT "INFO"
 #define LOG_ERROR_TEXT "ERROR"
 
-#define DEBUG_ON 0
+#define DEBUG_ON 1
 
 class LoggerInterface {
 public:
