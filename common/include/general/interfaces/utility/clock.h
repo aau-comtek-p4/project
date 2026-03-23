@@ -33,5 +33,6 @@ public:
 
   virtual TimeStamp format_time() = 0;
 };
+uint64_t ms_to_tick(uint64_t time_ms);
 
 #endif

@@ -3,6 +3,8 @@
 #include "general/common.h"
 #include "general/interfaces/event_loop/co_routine.h"
 #include "general/interfaces/event_loop/event_loop.h"
+#include "general/interfaces/storage/allocator.h"
+#include "general/interfaces/utility/logger.h"
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
 #include <coroutine>
@@ -12,23 +14,24 @@
 template <typename T> std::expected<void, int> spawn(T &&routine) {
 
   std::coroutine_handle<> handle = routine.handle;
-  auto res = tl_loop->allocate(sizeof(T));
+  auto res = program_loop->allocate(sizeof(T));
   if (!res.has_value()) {
-    tl_logger->log_err(EVENT_LOOP_ERR_TAG,
-                       "In spawn failed to allocate enough space for coroutine "
-                       "generator, error: [%s]",
-                       custom_strerror(res.error()));
+    program_logger->log_err(
+        EVENT_LOOP_ERR_TAG,
+        "In spawn failed to allocate enough space for coroutine "
+        "generator, error: [%s]",
+        custom_strerror(res.error()));
     return std::unexpected(res.error());
   }
   T *ptr = (T *)res.value();
   ptr[0] = std::move(routine);
-  auto enqueue_res = tl_loop->enque_staging(std::move(handle));
+  auto enqueue_res = program_loop->enque_staging(std::move(handle));
   if (enqueue_res.has_value()) {
     return {};
   }
-  tl_logger->log_err(EVENT_LOOP_ERR_TAG,
-                     "Failed to spawn co routine, received error: [%s]",
-                     custom_strerror(enqueue_res.error()));
+  program_logger->log_err(EVENT_LOOP_ERR_TAG,
+                          "Failed to spawn co routine, received error: [%s]",
+                          custom_strerror(enqueue_res.error()));
   return std::unexpected(enqueue_res.error());
 }
 
@@ -37,9 +40,9 @@ std::expected<void, int> spawn_future(T &&routine,
                                       uint64_t future_tick_offset) {
 
   std::coroutine_handle<> handle = routine.handle;
-  auto res = tl_loop->allocate(sizeof(T));
+  auto res = program_loop->allocate(sizeof(T));
   if (!res.has_value()) {
-    tl_logger->log_err(
+    program_logger->log_err(
         EVENT_LOOP_ERR_TAG,
         "In set future failed to allocate enough space for coroutine "
         "generator, error: [%s]",
@@ -49,13 +52,14 @@ std::expected<void, int> spawn_future(T &&routine,
   T *ptr = (T *)res.value();
   ptr[0] = std::move(routine);
   auto set_future_res =
-      tl_loop->set_future(std::move(handle), future_tick_offset);
+      program_loop->set_future(std::move(handle), future_tick_offset);
   if (set_future_res.has_value()) {
     return {};
   }
-  tl_logger->log_err(EVENT_LOOP_ERR_TAG,
-                     "Failed to set future co routine, received error: [%s]",
-                     custom_strerror(set_future_res.error()));
+  program_logger->log_err(
+      EVENT_LOOP_ERR_TAG,
+      "Failed to set future co routine, received error: [%s]",
+      custom_strerror(set_future_res.error()));
   return std::unexpected(set_future_res.error());
 }
 
@@ -96,37 +100,39 @@ struct Job::promise_type : public shared_promise_type {
     } catch (...) {
       error = CustomErrors::INVALID_STATE;
     }
-    tl_logger->log_err(COROUTINE_ERR_TAG, "Job received unexpected error: [%s]",
-                       custom_strerror(error));
+    program_logger->log_err(COROUTINE_ERR_TAG,
+                            "Job received unexpected error: [%s]",
+                            custom_strerror(error));
     this->error_type = error;
+    safe_shutdown(error);
   }
 
   std::suspend_always initial_suspend() { return {}; }
   std::suspend_never final_suspend() noexcept { return {}; }
   void *operator new(size_t n) {
-    auto res = tl_coroutine_frame_allocator->allocate(n);
+    auto res = program_coroutine_frame_allocator->allocate(n);
     if (!res.has_value()) {
-      tl_logger->log_err(
+      program_logger->log_err(
           COROUTINE_ERR_TAG,
           "Failed to allocate space for new task, got error: [%s]",
           custom_strerror(res.error()));
       safe_shutdown(res.error());
     }
-    tl_logger->log_debug(
+    program_logger->log_debug(
         COROUTINE_TAG, "Created job task id [%lu], space required: [%lu] bytes",
         total_coroutine_counter, n);
     return res.value();
   }
 
   void operator delete(void *ptr) {
-    auto res = tl_coroutine_frame_allocator->free(ptr);
+    auto res = program_coroutine_frame_allocator->free(ptr);
     if (res.has_value()) {
       return;
     }
-    tl_logger->log_err(COROUTINE_ERR_TAG,
-                       "Job failed to free itself via frame "
-                       "allocator, got error: [%s]",
-                       custom_strerror(res.error()));
+    program_logger->log_err(COROUTINE_ERR_TAG,
+                            "Job failed to free itself via frame "
+                            "allocator, got error: [%s]",
+                            custom_strerror(res.error()));
 
     safe_shutdown(res.error());
   }

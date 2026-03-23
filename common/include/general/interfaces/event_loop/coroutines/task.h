@@ -3,7 +3,9 @@
 
 #include "general/common.h"
 #include "general/interfaces/event_loop/co_routine.h"
+#include "general/interfaces/event_loop/event_loop.h"
 #include "general/interfaces/storage/allocator.h"
+#include "general/interfaces/utility/logger.h"
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
 #include <cassert>
@@ -28,7 +30,7 @@ public:
   template <typename U>
   std::coroutine_handle<> await_suspend(std::coroutine_handle<U> caller);
 
-  std::expected<T, int> await_resume();
+  T await_resume();
 
   Task(const Task &) = delete;
   Task(Task &&other);
@@ -51,7 +53,7 @@ Task<T>::await_suspend(std::coroutine_handle<U> caller) {
   return this->handle;
 }
 
-template <typename T> std::expected<T, int> Task<T>::await_resume() {
+template <typename T> T Task<T>::await_resume() {
   return std::move(this->handle.promise().result);
 }
 template <typename T> Task<T>::~Task() {
@@ -75,7 +77,7 @@ template <typename T> Task<T> &Task<T>::operator=(Task &&other) {
 
 template <typename T>
 struct Task<T>::promise_type : public shared_promise_type {
-  std::expected<T, int> result;
+  T result;
   size_t id;
   std::coroutine_handle<> continuation = nullptr;
   promise_type() {
@@ -91,22 +93,21 @@ struct Task<T>::promise_type : public shared_promise_type {
       if (!continuation_handler || own_handler.promise().cancelled) {
         return;
       }
-      auto res = tl_loop->enque_staging(continuation_handler);
+      auto res = program_loop->enque_staging(continuation_handler);
       if (res.has_value()) {
         return;
       }
-      tl_logger->log_err(
+      program_logger->log_err(
           COROUTINE_ERR_TAG,
           "Task id [%lu] failed to enque continuation, received error [%s]",
           own_handler.promise().id, custom_strerror(res.error()));
+      safe_shutdown(res.error());
     }
     void await_resume() noexcept {}
   };
   auto get_return_object() { return Task<T>(handle_type::from_promise(*this)); }
 
-  template <std::convertible_to<T> From> void return_value(From &&from) {
-    this->result = std::forward<From>(from);
-  }
+  void return_value(T val) { this->result = val; }
 
   void unhandled_exception() {
     int error;
@@ -118,27 +119,29 @@ struct Task<T>::promise_type : public shared_promise_type {
       error = e.code().value();
     } catch (const std::runtime_error &) {
       error = CustomErrors::HARDWARE_FAILURE;
-    } catch (...) {
+    } catch (const std::exception &e) {
+      program_logger->log_err(COROUTINE_ERR_TAG, "Exception type: [%s]",
+                              e.what());
       error = CustomErrors::INVALID_STATE;
     }
-    tl_logger->log_err(COROUTINE_ERR_TAG,
-                       "Task received unexpected error: [%s]",
-                       custom_strerror(error));
-    this->result = std::unexpected(error);
+    program_logger->log_err(COROUTINE_ERR_TAG,
+                            "Task received unexpected error: [%s]",
+                            custom_strerror(error));
+    safe_shutdown(error);
   }
 
   std::suspend_always initial_suspend() { return {}; }
   FinalAwaiter final_suspend() noexcept { return {}; }
   void *operator new(size_t n) {
-    auto res = tl_coroutine_frame_allocator->allocate(n);
+    auto res = program_coroutine_frame_allocator->allocate(n);
     if (!res.has_value()) {
-      tl_logger->log_err(
+      program_logger->log_err(
           COROUTINE_ERR_TAG,
           "Failed to allocate space for new task, got error: [%s]",
           custom_strerror(res.error()));
       safe_shutdown(res.error());
     }
-    tl_logger->log_debug(
+    program_logger->log_debug(
         COROUTINE_TAG, "Created new task id [%lu], space required: [%lu] bytes",
         total_coroutine_counter, n);
     return res.value();
@@ -146,14 +149,14 @@ struct Task<T>::promise_type : public shared_promise_type {
 
   void operator delete(void *ptr) {
 
-    auto res = tl_coroutine_frame_allocator->free(ptr);
+    auto res = program_coroutine_frame_allocator->free(ptr);
     if (res.has_value()) {
       return;
     }
-    tl_logger->log_err(COROUTINE_ERR_TAG,
-                       "Task failed to free itself via frame "
-                       "allocator, got error: [%s]",
-                       custom_strerror(res.error()));
+    program_logger->log_err(COROUTINE_ERR_TAG,
+                            "Task failed to free itself via frame "
+                            "allocator, got error: [%s]",
+                            custom_strerror(res.error()));
     safe_shutdown(res.error());
   }
 };

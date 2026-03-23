@@ -130,6 +130,7 @@ public:
   enum {
     TIMEOUT = 12000,
     OPERATION_TIMEOUT = 12001,
+
   };
 };
 
@@ -139,6 +140,12 @@ public:
     HARDWARE_FAILURE = 13000,
     BUS_ERROR = 13001,
     DRIVER_ERROR = 13002,
+  };
+};
+class ClockError {
+public:
+  enum {
+    MISSED_TICK = 14000,
   };
 };
 
@@ -154,6 +161,7 @@ class CustomErrors : public ConnectionError,
                      public IntegrityError,
                      public CapacityError,
                      public TimeoutError,
-                     public HardwareError {};
+                     public HardwareError,
+                     public ClockError {};
 
 #endif

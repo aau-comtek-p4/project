@@ -1,6 +1,9 @@
 #include "common/utility/clocks/basic_clock.h"
 #include "general/common.h"
 #include "general/interfaces/utility/clock.h"
+#include "general/interfaces/utility/logger.h"
+#include "general/misc/errors.h"
+#include "general/misc/shutdown.h"
 #include <algorithm>
 #include <cstdint>
 
@@ -34,7 +37,10 @@ void BasickClock::set_future_tick(uint64_t current_time) {
 
     this->tick_count += missed_ticks;
     if (missed_ns > this->tick_ns * 0.02) {
-      tl_logger->log_warning(CLOCK_TAG, "Missed tick by ns: [%lu]", missed_ns);
+      program_logger->log_warning(CLOCK_TAG, "Missed tick by ns: [%lu]",
+                                  missed_ns);
+
+      safe_shutdown(CustomErrors::MISSED_TICK);
     }
   }
   this->future_time += (missed_ticks + 1) * this->tick_ns;

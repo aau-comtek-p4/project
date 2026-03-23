@@ -1,6 +1,10 @@
 #include "general/interfaces/event_loop/event_loops/basic_event_loop.h"
 #include "general/common.h"
+#include "general/interfaces/event_loop/deadline_keeper.h"
 #include "general/interfaces/event_loop/event_loop.h"
+#include "general/interfaces/io/io.h"
+#include "general/interfaces/utility/clock.h"
+#include "general/interfaces/utility/logger.h"
 #include "general/misc/errors.h"
 #include <cstdint>
 #include <utility>
@@ -17,7 +21,7 @@ std::expected<void *, int> BasicEventLoop::allocate(size_t n) {
   if (res.has_value()) {
     return res.value();
   }
-  tl_logger->log_err(
+  program_logger->log_err(
       EVENT_LOOP_ERR_TAG,
       "Failed to allocate space for coroutine generator, received err: [%s]",
       custom_strerror(res.error()));
@@ -29,7 +33,7 @@ std::expected<void, int> BasicEventLoop::enque(std::coroutine_handle<> handle) {
   if (res.has_value()) {
     return {};
   }
-  tl_logger->log_err(
+  program_logger->log_err(
       EVENT_LOOP_ERR_TAG,
       "Failed to enque co routine handle to ready queue, received err: [%s]",
       custom_strerror(res.error()));
@@ -41,7 +45,7 @@ BasicEventLoop::enque_staging(std::coroutine_handle<> handle) {
   if (res.has_value()) {
     return {};
   }
-  tl_logger->log_err(
+  program_logger->log_err(
       EVENT_LOOP_ERR_TAG,
       "Failed to enque co routine handle to staging queue, received err: [%s]",
       custom_strerror(res.error()));
@@ -52,13 +56,12 @@ std::expected<void, int>
 BasicEventLoop::set_future(std::coroutine_handle<> handle,
                            uint64_t future_tick) {
 
-  tl_logger->log_debug(EVENT_LOOP_TAG, "Adding node to wheel");
-  auto res = tl_deadline_keeper->add_deadline(std::move(handle), future_tick);
-  tl_logger->log_debug(EVENT_LOOP_TAG, "Added node to wheel");
+  auto res =
+      program_deadline_keeper->add_deadline(std::move(handle), future_tick);
   if (res.has_value()) {
     return {};
   }
-  tl_logger->log_err(
+  program_logger->log_err(
       EVENT_LOOP_ERR_TAG,
       "Failed to enque future co routine handle to wheel, received err: [%s]",
       custom_strerror(res.error()));
@@ -76,23 +79,38 @@ std::expected<void, int> BasicEventLoop::step() {
         handler->resume();
       }
     } else {
-      tl_logger->log_debug(EVENT_LOOP_TAG, "NULL handle");
+
+      program_logger->log_debug(EVENT_LOOP_TAG, "NULL handle");
     }
 
     get_head_handle_res = this->ready_queue->deque();
   }
 
-  auto res = tl_deadline_keeper->enforce_deadlines();
-  uint64_t tick_start = tl_clock->spin_untill_future();
-  tl_clock->tick();
-  tl_clock->set_future_tick(tick_start);
+  auto res = program_deadline_keeper->enforce_deadlines();
+  if (!res.has_value()) {
+    program_logger->log_err(EVENT_LOOP_ERR_TAG,
+                            "Failed to enforce deadlines, error: [%s]",
+                            custom_strerror(res.error()));
+  }
+  program_io->submit();
+  program_io->process_cqe(program_clock->time_untill_futute() * 0.5);
+
+  // program_io->process_cqe(0);
+  uint64_t tick_start = program_clock->spin_untill_future();
+  program_clock->tick();
+  program_clock->set_future_tick(tick_start);
   return {};
 }
 
 std::expected<void, int> BasicEventLoop::run() {
+  uint64_t tick_start = program_clock->spin_untill_future();
+  program_clock->set_future_tick(tick_start);
   while (true) {
     auto res = this->step();
     if (!res.has_value()) {
+      program_logger->log_err(EVENT_LOOP_ERR_TAG,
+                              "Failed to take event loop step, error: [%s]",
+                              custom_strerror(res.error()));
     }
   }
 };

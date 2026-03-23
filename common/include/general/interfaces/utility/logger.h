@@ -1,6 +1,7 @@
 #ifndef LOGGER_INTERFACE_H
 #define LOGGER_INTERFACE_H
 
+#include <cstdint>
 #define LOG_WARNING_PREFIX "\033[33m"
 #define LOG_DEBUG_PREFIX "\033[38;2;124;159;255m"
 #define LOG_INFO_PREFIX "\033[37m"
@@ -12,6 +13,26 @@
 #define LOG_ERROR_TEXT "ERROR"
 
 #define DEBUG_ON 1
+enum LogLevel {
+  LOG_INFO,
+  LOG_DEBUG,
+  LOG_ERROR,
+  LOG_WARNING,
+};
+
+enum Component {};
+enum Reason {};
+union LogPayload {};
+
+struct LogEntry {
+  char msg[30];
+  LogLevel level;
+  Component component;
+  Reason reason;
+  uint64_t timestamp;
+  uint64_t tick_count;
+  LogPayload payload;
+};
 
 class LoggerInterface {
 public:

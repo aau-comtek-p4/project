@@ -12,7 +12,7 @@ size_t FPrintLogger::print_tag(const char *prefix, const char *type_text,
                                const char *tag, char *out_buf,
                                size_t max_size) {
 
-  auto time_stamp = tl_clock->format_time();
+  auto time_stamp = program_clock->format_time();
   size_t pre_size = snprintf(out_buf, max_size, "%s[%08lu] [%s] [%s]: ", prefix,
                              time_stamp.time_ms, tag, type_text) +
                     1;
@@ -36,6 +36,7 @@ void FPrintLogger::log_general_v(const char *prefix, const char *type_text,
   out_buffer[total_size + 1] = '[';
   out_buffer[total_size + 2] = '0';
   out_buffer[total_size + 3] = 'm';
+
   out_buffer[total_size + 4] = '\n';
 
   fwrite(out_buffer, sizeof(out_buffer[0]), total_size + 5, out_file);

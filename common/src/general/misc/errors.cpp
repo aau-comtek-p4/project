@@ -149,6 +149,8 @@ const char *custom_strerror(int err) {
     return "Bus error";
   case CustomErrors::DRIVER_ERROR:
     return "Driver error";
+  case CustomErrors::MISSED_TICK:
+    return "Clock missed tick";
 
   default:
     return "Unknown error";
