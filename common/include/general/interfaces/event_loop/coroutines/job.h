@@ -7,13 +7,14 @@
 #include "general/interfaces/utility/logger.h"
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
+#include <algorithm>
 #include <coroutine>
 #include <cstdint>
 #include <expected>
 #include <system_error>
 template <typename T> std::expected<void, int> spawn(T &&routine) {
+  auto typed_handle = routine.handle;
 
-  std::coroutine_handle<> handle = routine.handle;
   auto res = program_loop->allocate(sizeof(T));
   if (!res.has_value()) {
     program_logger->log_err(
@@ -23,8 +24,10 @@ template <typename T> std::expected<void, int> spawn(T &&routine) {
         custom_strerror(res.error()));
     return std::unexpected(res.error());
   }
-  T *ptr = (T *)res.value();
-  ptr[0] = std::move(routine);
+  T *ptr = new (res.value()) T(std::move(routine));
+
+  typed_handle.promise().self_cancellation = ptr;
+  std::coroutine_handle<> handle = typed_handle;
   auto enqueue_res = program_loop->enque_staging(std::move(handle));
   if (enqueue_res.has_value()) {
     return {};
@@ -38,8 +41,8 @@ template <typename T> std::expected<void, int> spawn(T &&routine) {
 template <typename T>
 std::expected<void, int> spawn_future(T &&routine,
                                       uint64_t future_tick_offset) {
+  auto typed_handle = routine.handle;
 
-  std::coroutine_handle<> handle = routine.handle;
   auto res = program_loop->allocate(sizeof(T));
   if (!res.has_value()) {
     program_logger->log_err(
@@ -49,8 +52,10 @@ std::expected<void, int> spawn_future(T &&routine,
         custom_strerror(res.error()));
     return std::unexpected(res.error());
   }
-  T *ptr = (T *)res.value();
-  ptr[0] = std::move(routine);
+
+  T *ptr = new (res.value()) T(std::move(routine));
+  typed_handle.promise().self_cancellation = ptr;
+  std::coroutine_handle<> handle = typed_handle;
   auto set_future_res =
       program_loop->set_future(std::move(handle), future_tick_offset);
   if (set_future_res.has_value()) {
@@ -108,7 +113,20 @@ struct Job::promise_type : public shared_promise_type {
   }
 
   std::suspend_always initial_suspend() { return {}; }
-  std::suspend_never final_suspend() noexcept { return {}; }
+  std::suspend_never final_suspend() noexcept {
+    void *gen_alloc = this->self_cancellation;
+    if (this->self_cancellation) {
+      auto res = program_loop->free(gen_alloc);
+      program_logger->log_debug(COROUTINE_TAG, "Freeing generator");
+      if (!res.has_value()) {
+
+        program_logger->log_err(COROUTINE_ERR_TAG, "Failed to free generator");
+        safe_shutdown(1);
+      }
+    }
+
+    return {};
+  }
   void *operator new(size_t n) {
     auto res = program_coroutine_frame_allocator->allocate(n);
     if (!res.has_value()) {

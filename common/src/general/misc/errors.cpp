@@ -63,6 +63,8 @@ const char *custom_strerror(int err) {
     return "Invalid address";
   case CustomErrors::INVALID_CHANNEL:
     return "Invalid channel";
+  case CustomErrors::FAILED_SETUP:
+    return "Setup failed";
 
   // StateError
   case CustomErrors::INVALID_STATE:

@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
 
 template <size_t bucket_size> struct Bucket {
   std::byte buffer[bucket_size];
@@ -23,7 +24,6 @@ private:
 public:
   Bucket<bucket_size> *buffer;
   size_t total_memory;
-  size_t used_memory;
   BucketAllocator(Bucket<bucket_size> *buffer);
   std::expected<void *, int> allocate(size_t n) override;
   std::expected<void, int> free(void *) override;
@@ -35,7 +35,7 @@ BucketAllocator<bucket_count, bucket_size>::BucketAllocator(
     Bucket<bucket_size> *buffer) {
   this->buffer = buffer;
   this->total_memory = bucket_count * bucket_size;
-  this->used_memory = 0;
+  this->amount_allocated = 0;
   this->free_bucket_header_ptr = this->buffer;
   this->allocated_buckets_count = 0;
   for (uint8_t i = 0; i < bucket_count - 1; i++) {
@@ -83,16 +83,23 @@ BucketAllocator<bucket_count, bucket_size>::allocate(size_t n) {
                             "Attempt to allocate when no more buckets");
     return std::unexpected(CapacityError::INSUFFICIENT_SPACE);
   }
-  assert((this->used_memory + n) <= this->total_memory);
+  assert((this->amount_allocated + n) <= this->total_memory);
   this->allocated_buckets_count += 1;
   Bucket<bucket_size> *current_bucket_index = this->free_bucket_header_ptr;
   assert(current_bucket_index->allocation_size == 0);
   current_bucket_index->allocation_size = n;
 
   this->free_bucket_header_ptr = current_bucket_index->next_ptr;
-  this->used_memory += n;
+  this->amount_allocated += n;
   program_logger->log_debug(ALLOCATOR_TAG,
                             "Allocated bucket, used bytes; [%lu]", n);
+  if (this->allocated_buckets_count >
+      bucket_count * ALLOCATOR_WARNING_THRESHOLD) {
+    program_logger->log_warning(
+        ALLOCATOR_TAG,
+        "Bucket allocator usage exceeded warning threshold, threshold: [%f]",
+        ALLOCATOR_WARNING_THRESHOLD);
+  }
   return current_bucket_index;
 }
 
@@ -128,12 +135,12 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
     return std::unexpected(CapacityError::OUTSIDE_RANGE);
   }
   size_t used_memory = cur_bucket_ptr->allocation_size;
-  assert((this->used_memory - used_memory) >= 0);
+  assert((this->amount_allocated - used_memory) >= 0);
   cur_bucket_ptr->next_ptr = this->free_bucket_header_ptr;
   this->free_bucket_header_ptr = cur_bucket_ptr;
   this->allocated_buckets_count -= 1;
   cur_bucket_ptr->allocation_size = 0;
-  this->used_memory -= used_memory;
+  this->amount_allocated -= used_memory;
   program_logger->log_debug(ALLOCATOR_TAG, "Freed bucket, freed bytes: [%lu]",
                             used_memory);
   return {};

@@ -50,6 +50,7 @@ public:
   enum {
     INVALID_ADDRESS = 4000,
     INVALID_CHANNEL = 4001,
+    FAILED_SETUP = 4002,
   };
 };
 

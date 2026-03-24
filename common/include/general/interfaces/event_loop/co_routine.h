@@ -7,6 +7,7 @@
 
 struct shared_promise_type {
   bool cancelled = false;
+  void *self_cancellation = nullptr;
 };
 
 struct CoRoutineInterface {

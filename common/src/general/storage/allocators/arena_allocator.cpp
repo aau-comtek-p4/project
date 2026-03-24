@@ -22,9 +22,15 @@ std::expected<void *, int> ArenaAllocator::allocate(size_t n) {
   }
   void *current_ptr = this->buffer + this->amount_allocated;
   this->amount_allocated += n;
-  program_logger->log_debug(ALLOCATOR_TAG,
-                            "Arena allocated: [%lu] at [%p], buffer base [%p]",
-                            n, current_ptr, this->buffer);
+  program_logger->log_debug(ALLOCATOR_TAG, "Arena allocated: [%lu]", n);
+  if (this->amount_allocated >
+      this->buffer_size * ALLOCATOR_WARNING_THRESHOLD) {
+    program_logger->log_warning(
+        ALLOCATOR_TAG,
+        "Arena allocator usage exceeded warning threshold, threshold: [%f]",
+        ALLOCATOR_WARNING_THRESHOLD);
+  }
+
   return current_ptr;
 }
 std::expected<void, int> ArenaAllocator::free(void *ptr) {

@@ -8,8 +8,10 @@
 
 #define ALLOCATOR_TAG "ALLOCATOR"
 #define ALLOCATOR_ERROR_TAG "ALLOCATOR ERROR"
+#define ALLOCATOR_WARNING_THRESHOLD 0.8
 class AllocatorInterface {
 public:
+  size_t amount_allocated;
   virtual std::expected<void *, int> allocate(size_t n) = 0;
   virtual std::expected<void, int> free(void *) = 0;
 };

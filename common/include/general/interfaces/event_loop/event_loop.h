@@ -12,6 +12,7 @@
 class EventLoopInterface {
 public:
   virtual std::expected<void *, int> allocate(size_t n) = 0;
+  virtual std::expected<void, int> free(void *ptr) = 0;
   virtual std::expected<void, int> enque(std::coroutine_handle<> handle) = 0;
   virtual std::expected<void, int>
   enque_staging(std::coroutine_handle<> handle) = 0;

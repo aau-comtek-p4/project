@@ -17,6 +17,7 @@ public:
                  QueueInterface<std::coroutine_handle<>> *staging_queue,
                  AllocatorInterface *coroutine_generator_allocator);
   std::expected<void *, int> allocate(size_t n) override;
+  std::expected<void, int> free(void *ptr) override;
   std::expected<void, int> enque(std::coroutine_handle<> handle) override;
   std::expected<void, int>
   enque_staging(std::coroutine_handle<> handle) override;

@@ -8,7 +8,6 @@ private:
   size_t buffer_size;
 
 public:
-  size_t amount_allocated;
   ArenaAllocator(uint8_t *buffer, size_t buffer_size);
   std::expected<void *, int> allocate(size_t n) override;
   std::expected<void, int> free(void *) override;

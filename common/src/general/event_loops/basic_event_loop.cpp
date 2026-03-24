@@ -28,6 +28,18 @@ std::expected<void *, int> BasicEventLoop::allocate(size_t n) {
   return std::unexpected(res.error());
 };
 
+std::expected<void, int> BasicEventLoop::free(void *ptr) {
+  auto res = this->coroutine_generator_allocator->free(ptr);
+  if (res.has_value()) {
+    return {};
+  }
+  program_logger->log_err(
+      EVENT_LOOP_ERR_TAG,
+      "Failed to free co routine generator, received err: [%s]",
+      custom_strerror(res.error()));
+  return std::unexpected(res.error());
+};
+
 std::expected<void, int> BasicEventLoop::enque(std::coroutine_handle<> handle) {
   auto res = this->ready_queue->enque(std::move(handle));
   if (res.has_value()) {
@@ -95,7 +107,6 @@ std::expected<void, int> BasicEventLoop::step() {
   program_io->submit();
   program_io->process_cqe(program_clock->time_untill_futute() * 0.5);
 
-  // program_io->process_cqe(0);
   uint64_t tick_start = program_clock->spin_untill_future();
   program_clock->tick();
   program_clock->set_future_tick(tick_start);
