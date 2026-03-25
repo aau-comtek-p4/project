@@ -27,93 +27,24 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 
-Task<int> sender() {
-  int client_socket = socket(AF_INET, SOCK_STREAM, 0);
-  if (fcntl(client_socket, F_SETFL, O_NONBLOCK) < 0) {
-    program_logger->log_err(NODE_ERROR_TAG,
-                            "Failed to set socket to non blocking");
-    safe_shutdown(ConfigurationError::FAILED_SETUP);
-  }
-  sockaddr_in server_addr;
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(7000);
-  server_addr.sin_addr.s_addr = INADDR_ANY;
-  auto res = co_await program_io->connect(client_socket, server_addr);
-  if (!res.has_value()) {
-    program_logger->log_err(NODE_ERROR_TAG, "Failed to connection to server");
-    safe_shutdown(res.error().cust_error);
-  }
-  program_logger->log_info(NODE_TAG,
-                           "Successfully established connection to server");
-  const char *msg = "Hello world!!!";
-  auto res2 =
-      co_await program_io->send(client_socket, (uint8_t *)msg, strlen(msg));
-  if (!res2.has_value()) {
-    program_logger->log_err(NODE_ERROR_TAG, "Failed to send message to server");
-    safe_shutdown(res2.error().cust_error);
-  }
-  program_logger->log_info(NODE_TAG, "Successfully sent message to server");
-  auto res3 = program_buffer_allocator->allocate(1024);
-  if (!res3.has_value()) {
-    program_logger->log_err(NODE_ERROR_TAG,
-                            "Failed to allocate buffer for server msg");
-    safe_shutdown(res3.error());
-  }
-  uint8_t *buffer = (uint8_t *)res3.value();
-  auto res4 = co_await program_io->recv(client_socket, buffer, 1024);
-  if (!res4.has_value()) {
-    program_logger->log_err(NODE_ERROR_TAG,
-                            "Failed to receive message from server");
-    safe_shutdown(res4.error().cust_error);
-  }
-  size_t bytes_read = res4.value();
-
-  program_logger->log_info(NODE_TAG, "Read [%lu] from server", bytes_read);
-  buffer[bytes_read] = 0;
-  program_logger->log_info(NODE_TAG, "Received: [%s]", buffer);
-
-  auto res5 = co_await program_io->close(client_socket);
-  if (!res5.has_value()) {
-    program_logger->log_err(NODE_ERROR_TAG,
-                            "Failed to close connection to server");
-    safe_shutdown(res5.error().cust_error);
-  }
-
-  program_logger->log_info(NODE_TAG, "Succesfully closed connection to server");
-  auto res6 = program_buffer_allocator->free(buffer);
-  if (!res6.has_value()) {
-    program_logger->log_err(NODE_ERROR_TAG,
-                            "Failed to free client buffer, error: [%s]",
-                            custom_strerror(res6.error()));
-    safe_shutdown(res6.error());
-  }
-  co_return 1;
-}
-
-Job keep_sending() {
-  size_t a = 0;
-  while (true) {
-    co_await sender();
-    a += 1;
-    program_logger->log_info(NODE_TAG, "Sent: [%lu]", a);
-    co_await sleep_for(ms_to_tick(1000));
-  }
-}
-
 int main() {
+  ProgramContext ctxt;
+  program_ctxt = &ctxt;
   BasickClock clock(CLOCK_MONOTONIC, NS_PR_MS * CLOCK_MS_PR_TICK);
-  program_clock = &clock;
+  program_ctxt->clock = &clock;
   FPrintLogger logger;
-  program_logger = &logger;
+  program_ctxt->logger = &logger;
   const size_t arena_size = MAX_STACK_SIZE;
 
   uint8_t arena_buffer[arena_size] = {0};
   ArenaAllocator stack_allocator(arena_buffer, arena_size);
 
-  program_logger->log_info(NODE_TAG, "Created arena, size: [%lu]", arena_size);
-  init_globals(&stack_allocator);
+  program_ctxt->logger->log_info(NODE_TAG, "Created arena, size: [%lu]",
+                                 arena_size);
+  node_init_ctxt(program_ctxt, &stack_allocator);
 
-  auto _ = spawn(keep_sending());
-
-  _ = program_loop->run();
+  uint64_t start_time = program_ctxt->clock->spin_untill_future();
+  program_ctxt->clock->set_future_tick(start_time);
+  auto _ = program_ctxt->loop->run();
+  safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM, .error = 1});
 }

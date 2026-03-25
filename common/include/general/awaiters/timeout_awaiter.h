@@ -13,7 +13,7 @@ template <typename T> struct TimeoutAwaiter {
   T routine;
   uint64_t timeout;
   using promise_type = T::promise_type;
-  using return_type = std::expected<typename T::value_type, int>;
+  using return_type = T::value_type;
   std::coroutine_handle<promise_type> routine_handler;
   DeadlineIndexKeeper *deadline_index;
   TimeoutAwaiter(T &&routine, uint64_t timeout)
@@ -24,11 +24,12 @@ template <typename T> struct TimeoutAwaiter {
     this->routine_handler = routine.handle;
     this->routine_handler.promise().continuation = h;
     spawn(std::move(routine));
-    auto res = program_deadline_keeper->add_deadline(h, this->timeout);
+    auto res = program_ctxt->deadline_tracker->add_deadline(
+        h, &this->routine_handler.promise(), this->timeout);
     if (!res.has_value()) {
-      program_logger->log_err(COROUTINE_TAG,
-                              "Failed to add deadline, error: [%s]",
-                              custom_strerror(res.error()));
+      program_ctxt->logger->log_err(COROUTINE_TAG,
+                                    "Failed to add deadline, error: [%s]",
+                                    custom_strerror(res.error()));
     }
     this->deadline_index = res.value();
   }
@@ -36,14 +37,17 @@ template <typename T> struct TimeoutAwaiter {
   return_type await_resume() {
     if (this->routine_handler.done()) {
       this->deadline_index->cancelled = true;
-      return this->routine_handler.promise().result;
+      return_type res = this->routine_handler.promise().result;
+      return res;
     }
     this->routine_handler.promise().cancelled = true;
-    return std::unexpected(TimeoutError::OPERATION_TIMEOUT);
+    return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                                        .error = TimeoutError::TIMEOUT});
   }
 };
 template <typename T>
 TimeoutAwaiter<T> run_with_timeout(T &&routine, uint64_t timeout) {
+
   return TimeoutAwaiter<T>(std::move(routine), timeout);
 }
 

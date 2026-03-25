@@ -1,6 +1,7 @@
 #ifndef SHUTDOWN_H
 
 #define SHUTDOWN_H
-void safe_shutdown(int err);
+#include "general/misc/errors.h"
+void safe_shutdown(ErrorWrapper err);
 
 #endif

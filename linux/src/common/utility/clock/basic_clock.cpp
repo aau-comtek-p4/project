@@ -2,6 +2,7 @@
 #include "general/common.h"
 #include "general/interfaces/utility/clock.h"
 #include "general/interfaces/utility/logger.h"
+#include "general/interfaces/utility/metrics.h"
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
 #include <algorithm>
@@ -36,11 +37,12 @@ void BasickClock::set_future_tick(uint64_t current_time) {
     missed_ticks = missed_ns / this->tick_ns;
 
     this->tick_count += missed_ticks;
-    if (missed_ns > this->tick_ns * 0.02) {
-      program_logger->log_warning(CLOCK_TAG, "Missed tick by ns: [%lu]",
-                                  missed_ns);
+    if (missed_ns > this->tick_ns * MISSED_TICK_WARNING_THRESHOLD) {
+      program_ctxt->logger->log_warning(CLOCK_TAG, "Missed tick by ns: [%lu]",
+                                        missed_ns);
 
-      safe_shutdown(CustomErrors::MISSED_TICK);
+      program_ctxt->metrics->document_metric(MetricType::TICK_MISS);
+      // safe_shutdown(CustomErrors::MISSED_TICK);
     }
   }
   this->future_time += (missed_ticks + 1) * this->tick_ns;

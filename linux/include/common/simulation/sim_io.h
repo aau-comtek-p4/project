@@ -1,19 +1,13 @@
-#ifndef LINUX_IO_H
-#define LINUX_IO_H
+#ifndef SIM_IO_H
+#define SIM_IO_H
 
 #include "general/interfaces/io/io.h"
-#include "general/misc/errors.h"
-#include <cstddef>
-#include <cstdint>
-#include <liburing.h>
-
-class LinuxIO : public IOInterface {
+class SimIO : public IOInterface {
 private:
-  io_uring ring;
   size_t queue_depth;
 
 public:
-  LinuxIO(size_t queue_depth);
+  SimIO(size_t queue_depth);
   Task<std::expected<int, ErrorWrapper>> read(int id, uint8_t *out_buf,
                                               size_t max_read) override;
   Task<std::expected<int, ErrorWrapper>> write(int id, uint8_t *in_buf,

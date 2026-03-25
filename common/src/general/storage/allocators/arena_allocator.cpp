@@ -13,19 +13,21 @@ ArenaAllocator::ArenaAllocator(uint8_t *buffer, size_t buffer_size)
   this->amount_allocated = 0;
 }
 
-std::expected<void *, int> ArenaAllocator::allocate(size_t n) {
+std::expected<void *, ErrorWrapper> ArenaAllocator::allocate(size_t n) {
   if (this->amount_allocated + n >= this->buffer_size) {
-    program_logger->log_err(
+    program_ctxt->logger->log_err(
         ALLOCATOR_ERROR_TAG,
         "Attempt to allocate arena allocator more than size");
-    return std::unexpected(CapacityError::INSUFFICIENT_SPACE);
+    return std::unexpected(
+        ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                     .error = CapacityError::INSUFFICIENT_SPACE});
   }
   void *current_ptr = this->buffer + this->amount_allocated;
   this->amount_allocated += n;
-  program_logger->log_debug(ALLOCATOR_TAG, "Arena allocated: [%lu]", n);
+  program_ctxt->logger->log_debug(ALLOCATOR_TAG, "Arena allocated: [%lu]", n);
   if (this->amount_allocated >
       this->buffer_size * ALLOCATOR_WARNING_THRESHOLD) {
-    program_logger->log_warning(
+    program_ctxt->logger->log_warning(
         ALLOCATOR_TAG,
         "Arena allocator usage exceeded warning threshold, threshold: [%f]",
         ALLOCATOR_WARNING_THRESHOLD);
@@ -33,7 +35,7 @@ std::expected<void *, int> ArenaAllocator::allocate(size_t n) {
 
   return current_ptr;
 }
-std::expected<void, int> ArenaAllocator::free(void *ptr) {
+std::expected<void, ErrorWrapper> ArenaAllocator::free(void *ptr) {
   assert(ptr == NULL);
 
   this->amount_allocated = 0;

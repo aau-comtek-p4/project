@@ -1,7 +1,6 @@
 #ifndef GENERAL_ERRORS_H
 #define GENERAL_ERRORS_H
 
-const char *custom_strerror(int err);
 class ConnectionError {
 public:
   enum {
@@ -164,5 +163,12 @@ class CustomErrors : public ConnectionError,
                      public TimeoutError,
                      public HardwareError,
                      public ClockError {};
+
+struct ErrorWrapper {
+  enum { CUSTOM, ERRNO } tag;
+  int error;
+};
+
+const char *custom_strerror(ErrorWrapper err);
 
 #endif

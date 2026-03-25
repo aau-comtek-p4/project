@@ -5,6 +5,7 @@
 #include "general/interfaces/io/io.h"
 #include "general/interfaces/utility/clock.h"
 #include "general/interfaces/utility/logger.h"
+#include "general/interfaces/utility/metrics.h"
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
 #include <algorithm>
@@ -39,13 +40,12 @@ const char *get_io_type(IOType type) {
   }
   return "Unknown type";
 }
-class IOAwaiterInterface {
+class IOAwaiterInterface : public IOAwaitInterface {
 public:
   io_uring *ring;
   int fd;
   uint8_t *buf;
   size_t buffer_size;
-  std::coroutine_handle<> handle;
   int result;
   IOType type;
   void set_result(int result) { this->result = result; }
@@ -53,7 +53,10 @@ public:
 
   virtual void submit(io_uring_sqe *sqe) = 0;
   bool await_ready() { return false; }
-  void await_suspend(std::coroutine_handle<> handle) {
+  void await_suspend(std::coroutine_handle<
+                     Task<std::expected<int, ErrorWrapper>>::promise_type>
+                         handle) {
+    handle.promise().io_address = this;
     this->handle = handle;
     struct io_uring_sqe *sqe = io_uring_get_sqe(this->ring);
 
@@ -188,102 +191,127 @@ LinuxIO::LinuxIO(size_t queue_depth) : queue_depth(queue_depth) {
   io_uring_queue_init(this->queue_depth, &this->ring, 0);
 }
 
-Task<std::expected<int, IORes>> LinuxIO::read(int id, uint8_t *out_buf,
-                                              size_t max_read) {
+Task<std::expected<int, ErrorWrapper>> LinuxIO::read(int id, uint8_t *out_buf,
+                                                     size_t max_read) {
   int result = co_await IOReadAwaiter(&this->ring, id, out_buf, max_read);
   if (result < 0) {
-    co_return std::unexpected(IORes{.cust_error = ReadError::READ_FAILED,
-                                    .error_number = result * -1});
+    program_ctxt->metrics->document_metric(MetricType::READ_FAILED);
+    co_return std::unexpected(
+        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = result * -1});
   }
+  program_ctxt->metrics->document_metric(MetricType::FILE_READ);
   co_return result;
 }
 
-Task<std::expected<int, IORes>> LinuxIO::write(int id, uint8_t *in_buf,
-                                               size_t write_amount) {
+Task<std::expected<int, ErrorWrapper>> LinuxIO::write(int id, uint8_t *in_buf,
+                                                      size_t write_amount) {
   int result = co_await IOWriteAwaiter(&this->ring, id, in_buf, write_amount);
 
   if (result < 0) {
-    co_return std::unexpected(IORes{.cust_error = WriteError::WRITE_FAILED,
-                                    .error_number = result * -1});
+    program_ctxt->metrics->document_metric(MetricType::WRITE_FAILED);
+    co_return std::unexpected(
+        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = result * -1});
   }
+  program_ctxt->metrics->document_metric(MetricType::FILE_WRITE);
   co_return result;
 }
-Task<std::expected<int, IORes>> LinuxIO::open(const char *file_path, int flags,
-                                              mode_t mode) {
+Task<std::expected<int, ErrorWrapper>> LinuxIO::open(const char *file_path,
+                                                     int flags, mode_t mode) {
   int result = co_await IOOpenAwaiter(&this->ring, file_path, flags, mode);
 
   if (result < 0) {
-    co_return std::unexpected(IORes{.cust_error = OpenError::OPEN_FAILED,
-                                    .error_number = result * -1});
+    program_ctxt->metrics->document_metric(MetricType::FAILED_OPENED);
+    co_return std::unexpected(
+        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = result * -1});
   }
+  program_ctxt->metrics->document_metric(MetricType::OPENED_FILE);
   co_return result;
 }
 
-Task<std::expected<int, IORes>> LinuxIO::close(int fd) {
+Task<std::expected<int, ErrorWrapper>> LinuxIO::close(int fd) {
   int result = co_await IOCloseAwaiter(&this->ring, fd);
 
   if (result < 0) {
+    program_ctxt->metrics->document_metric(MetricType::CLOSED_FAILED);
     co_return std::unexpected(
-        IORes{.cust_error = 1, .error_number = result * -1});
+        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = result * -1});
   }
+  program_ctxt->metrics->document_metric(MetricType::CLOSED_FD);
   co_return result;
-}
-
-Task<std::expected<int, IORes>> LinuxIO::accept(int fd) {
+};
+Task<std::expected<int, ErrorWrapper>> LinuxIO::accept(int fd) {
   int result = co_await IOAcceptAwaiter(&this->ring, fd);
   if (result < 0) {
+    program_ctxt->metrics->document_metric(MetricType::FAILED_ACCEPT);
 
     co_return std::unexpected(
-        IORes{.cust_error = ConnectionError::CONNECTION_FAILED,
-              .error_number = result * -1});
+        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = result * -1});
   }
+  program_ctxt->metrics->document_metric(MetricType::ACCEPTED_CONNECTION);
   co_return result;
 }
 
-Task<std::expected<int, IORes>> LinuxIO::send(int fd, uint8_t *buf,
-                                              size_t buffer_size) {
+Task<std::expected<int, ErrorWrapper>> LinuxIO::send(int fd, uint8_t *buf,
+                                                     size_t buffer_size) {
   int result = co_await IOSendAwaiter(&this->ring, fd, buf, buffer_size);
   if (result < 0) {
-
-    co_return std::unexpected(IORes{.cust_error = SendError::SEND_FAILED,
-                                    .error_number = result * -1});
+    program_ctxt->metrics->document_metric(MetricType::FAILED_SEND);
+    co_return std::unexpected(
+        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = result * -1});
   }
+  program_ctxt->metrics->document_metric(MetricType::MESSAGE_SENT);
   co_return result;
 }
 
-Task<std::expected<int, IORes>> LinuxIO::recv(int fd, uint8_t *buf,
-                                              size_t buffer_size) {
+Task<std::expected<int, ErrorWrapper>> LinuxIO::recv(int fd, uint8_t *buf,
+                                                     size_t buffer_size) {
   int result = co_await IORecvAwaiter(&this->ring, fd, buf, buffer_size);
   if (result < 0) {
+    program_ctxt->metrics->document_metric(MetricType::FAILED_RECEIVE);
 
-    co_return std::unexpected(IORes{.cust_error = ReceiveError::RECEIVED_FAILED,
-                                    .error_number = result * -1});
+    co_return std::unexpected(
+        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = result * -1});
   }
+  if (result == 0) {
+    program_ctxt->metrics->document_metric(MetricType::DISCONNECT);
+    co_return result;
+  }
+  program_ctxt->metrics->document_metric(MetricType::MESSAGE_RECEIVED);
   co_return result;
 }
 
-Task<std::expected<int, IORes>> LinuxIO::connect(int fd,
-                                                 sockaddr_in server_addr) {
+Task<std::expected<int, ErrorWrapper>>
+LinuxIO::connect(int fd, sockaddr_in server_addr) {
   int result = co_await IOConnectAwaiter(&this->ring, fd, server_addr);
   if (result < 0) {
 
+    program_ctxt->metrics->document_metric(MetricType::FAILED_CONNECT);
     co_return std::unexpected(
-        IORes{.cust_error = ConnectionError::CONNECTION_FAILED,
-              .error_number = result * -1});
+        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = result * -1});
   }
+
+  program_ctxt->metrics->document_metric(MetricType::CONNECTION_RECEIVED);
   co_return result;
 }
-void LinuxIO::submit() { io_uring_submit(&this->ring); }
+void LinuxIO::submit() {
+  program_ctxt->logger->log_debug(IO_TAG, "Submitted IO");
+  io_uring_submit(&this->ring);
+}
+void LinuxIO::cancel(const void *user_data) {
+  io_uring_sqe *sqe = io_uring_get_sqe(&this->ring);
+  io_uring_prep_cancel(sqe, user_data, 0);
+  io_uring_sqe_set_data(sqe, nullptr);
+}
 
 void LinuxIO::process_cqe(uint64_t timeout_ns) {
-  program_logger->log_debug(IO_TAG, "Processing cqe");
+  program_ctxt->logger->log_debug(IO_TAG, "Processing cqe");
   io_uring_cqe *cqe;
 
   uint32_t tv_sec = timeout_ns / (NS_PR_MS * MS_PR_S);
   uint32_t tv_nsec = timeout_ns % (NS_PR_MS * MS_PR_S);
   struct __kernel_timespec ts{.tv_sec = tv_sec, .tv_nsec = tv_nsec};
 
-  program_logger->log_debug(
+  program_ctxt->logger->log_debug(
       IO_TAG, "Setting cqe timeout, timeout ns: [%lu],sec: [%u], ns: [%u]",
       timeout_ns, tv_sec, tv_nsec);
   io_uring_wait_cqe_timeout(&this->ring, &cqe, &ts);
@@ -292,22 +320,30 @@ void LinuxIO::process_cqe(uint64_t timeout_ns) {
   io_uring_for_each_cqe(&this->ring, head, cqe) {
     auto awaiter =
         static_cast<IOAwaiterInterface *>(io_uring_cqe_get_data(cqe));
+    if (!awaiter) {
+      count += 1;
+      continue;
+    }
+
+    program_ctxt->logger->log_debug(IO_TAG, "CQE RES: [%i]", cqe->res);
+
     awaiter->set_result(cqe->res);
 
-    program_logger->log_debug(IO_TAG, "IO finished, type: [%s], res: [%i]",
-                              awaiter->get_type(), cqe->res);
-    auto res = program_loop->enque_staging(awaiter->handle);
+    program_ctxt->logger->log_debug(IO_TAG,
+                                    "IO finished, type: [%s], res: [%i]",
+                                    awaiter->get_type(), cqe->res);
+    auto res = program_ctxt->loop->enque_staging(awaiter->handle);
     if (!res.has_value()) {
-      program_logger->log_err(IO_ERROR_TAG,
-                              "Failed to enque cqe handler, error: [%s]",
-                              custom_strerror(res.error()));
+      program_ctxt->logger->log_err(IO_ERROR_TAG,
+                                    "Failed to enque cqe handler, error: [%s]",
+                                    custom_strerror(res.error()));
       safe_shutdown(res.error());
     }
     count += 1;
   }
 
   if (count == 0) {
-    program_logger->log_debug(IO_TAG, "No CQE in queue");
+    program_ctxt->logger->log_debug(IO_TAG, "No CQE in queue");
   }
   io_uring_cq_advance(&this->ring, count);
 }

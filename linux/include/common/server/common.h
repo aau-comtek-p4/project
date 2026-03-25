@@ -1,6 +1,7 @@
 #ifndef SERVER_COMMON_H
 #define SERVER_COMMON_H
 
+#include "general/common.h"
 #define SERVER_TAG "SERVER"
 #define SERVER_ERROR_TAG "SERVER ERROR"
 #define CLOCK_MS_PR_TICK 10
@@ -19,5 +20,8 @@
 #define MAX_BUFFER_AMOUNT 20
 #define MAX_DEADLINES 20
 #define MAX_QUEUE_DEPTH 20
+
+void server_init_ctxt(ProgramContext *ctxt,
+                      AllocatorInterface *general_allocator);
 
 #endif

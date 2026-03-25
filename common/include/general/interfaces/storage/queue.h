@@ -14,8 +14,8 @@
 
 template <typename T> class QueueInterface {
 public:
-  virtual std::expected<void, int> enque(T &&val) = 0;
-  virtual std::expected<T *, int> deque() = 0;
+  virtual std::expected<void, ErrorWrapper> enque(T &&val) = 0;
+  virtual std::expected<T *, ErrorWrapper> deque() = 0;
 };
 
 template <typename T, size_t queue_size>
@@ -27,18 +27,22 @@ private:
   size_t queue_items = 0;
 
 public:
-  std::expected<void, int> enque(T &&val) override {
+  std::expected<void, ErrorWrapper> enque(T &&val) override {
     if (queue_items >= queue_size) {
-      return std::unexpected(CapacityError::INSUFFICIENT_SPACE);
+      return std::unexpected(
+          ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                       .error = CapacityError::INSUFFICIENT_SPACE});
     }
     storage[tail] = std::move(val);
     tail = (tail + 1) % queue_size;
     queue_items += 1;
     return {};
   };
-  std::expected<T *, int> deque() override {
+  std::expected<T *, ErrorWrapper> deque() override {
     if (queue_items <= 0) {
-      return std::unexpected(CapacityError::BUFFER_UNDERFLOW);
+      return std::unexpected(
+          ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                       .error = CapacityError::BUFFER_UNDERFLOW});
     }
     T *ptr = &storage[head];
     head = (head + 1) % queue_size;

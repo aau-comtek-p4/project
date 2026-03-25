@@ -11,7 +11,7 @@ struct SkipAwaiter {
   SkipAwaiter(uint64_t timeout) : timeout(timeout) {}
   bool await_ready() { return false; }
   void await_suspend(std::coroutine_handle<> h) {
-    auto _ = program_deadline_keeper->add_deadline(h, timeout);
+    auto _ = program_ctxt->deadline_tracker->add_deadline(h, nullptr, timeout);
   }
   void await_resume() {};
 };

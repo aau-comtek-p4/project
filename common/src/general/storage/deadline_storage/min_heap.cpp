@@ -1,12 +1,15 @@
 
 #include "general/common.h"
+#include "general/interfaces/event_loop/co_routine.h"
 #include "general/interfaces/event_loop/deadline_keeper.h"
 #include "general/interfaces/event_loop/deadline_storage/min_heap_storage.h"
 #include "general/interfaces/event_loop/event_loop.h"
+#include "general/interfaces/io/io.h"
 #include "general/interfaces/storage/allocator.h"
 #include "general/interfaces/utility/clock.h"
 #include "general/interfaces/utility/logger.h"
 #include "general/misc/errors.h"
+#include "general/misc/shutdown.h"
 #include <cassert>
 #include <coroutine>
 #include <cstddef>
@@ -19,19 +22,29 @@ DeadlineMinHeap::DeadlineMinHeap(Deadline *deadline_buffer, size_t buffer_size,
     : deadline_index_allocator(deadline_index_allocator),
       heap_buffer(deadline_buffer), buffer_size(buffer_size) {}
 
-std::expected<DeadlineIndexKeeper *, int>
+std::expected<DeadlineIndexKeeper *, ErrorWrapper>
 DeadlineMinHeap::add_deadline(std::coroutine_handle<> handle,
+                              shared_promise_type *promise_type,
                               uint64_t deadline) {
+  if (deadline <= program_ctxt->clock->get_time_pr_tick() / NS_PR_MS) {
+    program_ctxt->logger->log_err(
+        DEADLINE_TAG,
+        "Deadline [%lu] offset is lower/equal to ns pr. tick [%lu] ms",
+        deadline, program_ctxt->clock->get_time_pr_tick() / NS_PR_MS);
+    safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM, .error = 1});
+  }
   if (this->element_amount >= this->buffer_size) {
 
-    program_logger->log_warning(DEADLINE_TAG,
-                                "Attempt to add deadline to full buffer");
-    return std::unexpected(CapacityError::INSUFFICIENT_SPACE);
+    program_ctxt->logger->log_warning(DEADLINE_TAG,
+                                      "Attempt to add deadline to full buffer");
+    return std::unexpected(
+        ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                     .error = CapacityError::INSUFFICIENT_SPACE});
   }
   auto res =
       this->deadline_index_allocator->allocate(sizeof(DeadlineIndexKeeper));
   if (!res.has_value()) {
-    program_logger->log_err(
+    program_ctxt->logger->log_err(
         DEADLINE_TAG, "Error allocating space for deadline index, error: [%s]",
         custom_strerror(res.error()));
     return std::unexpected(res.error());
@@ -41,8 +54,11 @@ DeadlineMinHeap::add_deadline(std::coroutine_handle<> handle,
 
   Deadline new_deadline{
       .handle = handle,
-      .deadline_ms = deadline + program_clock->rt_since_start() / NS_PR_MS,
-      .deadline_index = deadline_index};
+      .deadline_ms =
+          deadline + program_ctxt->clock->rt_since_start() / NS_PR_MS,
+      .deadline_index = deadline_index,
+      .promise_type = promise_type,
+  };
   if (this->element_amount == 0) {
     this->heap_buffer[0] = new_deadline;
   }
@@ -56,32 +72,42 @@ DeadlineMinHeap::add_deadline(std::coroutine_handle<> handle,
     index = (index - 1) / 2;
   }
   this->element_amount += 1;
-  program_logger->log_debug(DEADLINE_TAG, "Added deadline with ms: [%lu]",
-                            new_deadline.deadline_ms);
+  program_ctxt->logger->log_debug(DEADLINE_TAG, "Added deadline with ms: [%lu]",
+                                  new_deadline.deadline_ms);
 
   return deadline_index;
 }
-std::expected<void, int> DeadlineMinHeap::enforce_deadlines() {
+std::expected<void, ErrorWrapper> DeadlineMinHeap::enforce_deadlines() {
   if (this->element_amount == 0) {
-    program_logger->log_debug(DEADLINE_TAG, "No deadlines stored to enforce");
+    program_ctxt->logger->log_debug(DEADLINE_TAG,
+                                    "No deadlines stored to enforce");
     return {};
   }
-  uint64_t current_time =
-      (program_clock->rt_since_start() + program_clock->get_time_pr_tick()) /
-      NS_PR_MS;
+  uint64_t current_time = (program_ctxt->clock->rt_since_start() +
+                           program_ctxt->clock->get_time_pr_tick()) /
+                          NS_PR_MS;
 
-  program_logger->log_debug(DEADLINE_TAG,
-                            "Current time: [%lu], smallest deadline: [%lu]",
-                            current_time, this->heap_buffer[0].deadline_ms);
+  program_ctxt->logger->log_debug(
+      DEADLINE_TAG, "Current time: [%lu], smallest deadline: [%lu]",
+      current_time, this->heap_buffer[0].deadline_ms);
   while (this->heap_buffer[0].deadline_ms <= current_time &&
          this->element_amount != 0) {
     if (!this->heap_buffer[0].deadline_index->cancelled) {
-      program_logger->log_debug(DEADLINE_TAG,
-                                "Enqued handler with deadline: [%lu]",
-                                this->heap_buffer[0].deadline_ms);
-      auto res = program_loop->enque_staging(this->heap_buffer[0].handle);
+      program_ctxt->logger->log_debug(DEADLINE_TAG,
+                                      "Enqued handler with deadline: [%lu]",
+                                      this->heap_buffer[0].deadline_ms);
+
+      if (this->heap_buffer[0].promise_type) {
+        if (this->heap_buffer[0].promise_type->io_address) {
+          program_ctxt->logger->log_debug(DEADLINE_TAG, "Cancelled io");
+          program_ctxt->io->cancel(
+              this->heap_buffer[0].promise_type->io_address);
+        }
+      }
+
+      auto res = program_ctxt->loop->enque_staging(this->heap_buffer[0].handle);
       if (!res.has_value()) {
-        program_logger->log_warning(
+        program_ctxt->logger->log_warning(
             DEADLINE_TAG,
             "Failed to enqueue handler with deadline: [%lu], error: [%s]",
             this->heap_buffer[0].deadline_ms, custom_strerror(res.error()));
@@ -91,19 +117,19 @@ std::expected<void, int> DeadlineMinHeap::enforce_deadlines() {
       res = this->deadline_index_allocator->free(
           this->heap_buffer[0].deadline_index);
       if (!res.has_value()) {
-        program_logger->log_err(DEADLINE_TAG,
-                                "Failed to free deadline index, error: [%s]",
-                                custom_strerror(res.error()));
+        program_ctxt->logger->log_err(
+            DEADLINE_TAG, "Failed to free deadline index, error: [%s]",
+            custom_strerror(res.error()));
         return std::unexpected(res.error());
       }
     } else {
-      program_logger->log_debug(DEADLINE_TAG, "Deadline was cancelled");
+      program_ctxt->logger->log_debug(DEADLINE_TAG, "Deadline was cancelled");
       auto res = this->deadline_index_allocator->free(
           this->heap_buffer[0].deadline_index);
       if (!res.has_value()) {
-        program_logger->log_err(DEADLINE_TAG,
-                                "Failed to free deadline index, error: [%s]",
-                                custom_strerror(res.error()));
+        program_ctxt->logger->log_err(
+            DEADLINE_TAG, "Failed to free deadline index, error: [%s]",
+            custom_strerror(res.error()));
         return std::unexpected(res.error());
       }
     }

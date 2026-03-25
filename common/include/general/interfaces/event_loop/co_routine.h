@@ -4,10 +4,12 @@
 
 #define COROUTINE_TAG "COROUTINE"
 #define COROUTINE_ERR_TAG "COROUTINE ERROR"
+class IOAwaitInterface;
 
 struct shared_promise_type {
   bool cancelled = false;
   void *self_cancellation = nullptr;
+  IOAwaitInterface *io_address = nullptr;
 };
 
 struct CoRoutineInterface {

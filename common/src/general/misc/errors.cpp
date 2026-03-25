@@ -1,7 +1,14 @@
 #include "general/misc/errors.h"
+#include <cstring>
 
-const char *custom_strerror(int err) {
-  switch (err) {
+const char *custom_strerror(ErrorWrapper err) {
+  switch (err.tag) {
+  case ErrorWrapper::ERRNO:
+    return strerror(err.error);
+  case ErrorWrapper::CUSTOM:
+    break;
+  }
+  switch (err.error) {
   // ConnectionError
   case CustomErrors::CONNECTION_FAILED:
     return "Connection failed";

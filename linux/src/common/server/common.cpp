@@ -1,64 +1,73 @@
 #include "general/common.h"
 #include "common.h"
 #include "common/io/io.h"
-#include "common/node/common.h"
+#include "common/server/common.h"
+#include "common/utility/metric.h"
 #include "general/interfaces/event_loop/deadline_keeper.h"
 #include "general/interfaces/event_loop/deadline_storage/min_heap_storage.h"
 #include "general/interfaces/event_loop/event_loops/basic_event_loop.h"
-#include "general/interfaces/io/io.h"
 #include "general/interfaces/storage/allocator.h"
 #include "general/interfaces/storage/allocators/bucket_allocator.h"
 #include "general/interfaces/storage/queue.h"
 #include <coroutine>
 #include <cstddef>
+#include <cstring>
 
-size_t innit_frame_allocator(AllocatorInterface *allocator);
-size_t innit_bucket_allocator(AllocatorInterface *allocator);
-size_t innit_event_loop(AllocatorInterface *allocator);
-size_t innit_deadline(AllocatorInterface *allocator);
-size_t innit_io(AllocatorInterface *allocator);
-void init_globals(AllocatorInterface *allocator) {
+size_t server_innit_frame_allocator(ProgramContext *ctxt,
+                                    AllocatorInterface *allocator);
+size_t server_innit_bucket_allocator(ProgramContext *ctxt,
+                                     AllocatorInterface *allocator);
+size_t server_innit_event_loop(ProgramContext *ctxt,
+                               AllocatorInterface *allocator);
+size_t server_innit_deadline(ProgramContext *ctxt,
+                             AllocatorInterface *allocator);
+size_t server_innit_io(ProgramContext *ctxt, AllocatorInterface *allocator);
+size_t server_innit_metrics(ProgramContext *ctxt,
+                            AllocatorInterface *allocator);
+void server_init_ctxt(ProgramContext *ctxt, AllocatorInterface *allocator) {
 
   size_t total_expected = 0;
-  const size_t expected_frame_allocator_size = innit_frame_allocator(allocator);
+  const size_t expected_frame_allocator_size =
+      server_innit_frame_allocator(ctxt, allocator);
   total_expected += expected_frame_allocator_size;
   const size_t actual_frame_allocator_size = allocator->amount_allocated;
-  program_logger->log_info(
-      NODE_TAG,
+  ctxt->logger->log_info(
+      SERVER_TAG,
       "Frame allocator initialized, expected size: [%lu], actual size: [%lu]",
       expected_frame_allocator_size, actual_frame_allocator_size);
   const size_t expected_bucket_allocator_size =
-      innit_bucket_allocator(allocator);
+      server_innit_bucket_allocator(ctxt, allocator);
 
   total_expected += expected_bucket_allocator_size;
   const size_t actual_bucket_allocator_size =
       allocator->amount_allocated - actual_frame_allocator_size;
-  program_logger->log_info(
-      NODE_TAG,
+  ctxt->logger->log_info(
+      SERVER_TAG,
       "Bucket allocator initialized, expected size: [%lu], actual size: [%lu]",
       expected_bucket_allocator_size, actual_bucket_allocator_size);
-  const size_t expected_event_loop_size = innit_event_loop(allocator);
+  const size_t expected_event_loop_size =
+      server_innit_event_loop(ctxt, allocator);
 
   total_expected += expected_event_loop_size;
   const size_t actual_event_loop_size = allocator->amount_allocated -
                                         actual_bucket_allocator_size -
                                         actual_frame_allocator_size;
-  program_logger->log_info(
-      NODE_TAG,
+  ctxt->logger->log_info(
+      SERVER_TAG,
       "Event loop initialized, expected size: [%lu], actual size: [%lu]",
       expected_event_loop_size, actual_event_loop_size);
-  const size_t expected_deadline_size = innit_deadline(allocator);
+  const size_t expected_deadline_size = server_innit_deadline(ctxt, allocator);
 
   total_expected += expected_deadline_size;
   const size_t actual_deadline_size =
       allocator->amount_allocated - actual_event_loop_size -
       actual_bucket_allocator_size - actual_frame_allocator_size;
 
-  program_logger->log_info(
-      NODE_TAG,
+  ctxt->logger->log_info(
+      SERVER_TAG,
       "Deadline initialized, expected size: [%lu], actual size: [%lu]",
       expected_deadline_size, actual_deadline_size);
-  const size_t expected_io_size = innit_io(allocator);
+  const size_t expected_io_size = server_innit_io(ctxt, allocator);
 
   total_expected += expected_io_size;
   const size_t actual_io_size =
@@ -66,16 +75,28 @@ void init_globals(AllocatorInterface *allocator) {
       actual_frame_allocator_size - actual_event_loop_size -
       actual_bucket_allocator_size;
 
-  program_logger->log_info(
-      NODE_TAG, "IO initialized, expected size: [%lu], actual size: [%lu]",
+  ctxt->logger->log_info(
+      SERVER_TAG, "IO initialized, expected size: [%lu], actual size: [%lu]",
       expected_io_size, actual_io_size);
+  const size_t expected_metric_size = server_innit_metrics(ctxt, allocator);
+  total_expected += expected_metric_size;
+  const size_t actual_metric_size =
+      allocator->amount_allocated - actual_io_size - actual_deadline_size -
+      actual_frame_allocator_size - actual_event_loop_size -
+      actual_bucket_allocator_size;
 
-  program_logger->log_info(NODE_TAG,
-                           "Allocated globals, expected: [%lu], actual: [%lu]",
-                           total_expected, allocator->amount_allocated);
+  ctxt->logger->log_info(
+      SERVER_TAG,
+      "Metric initialized, expected size: [%lu], actual size: [%lu]",
+      expected_metric_size, actual_metric_size);
+
+  ctxt->logger->log_info(SERVER_TAG,
+                         "Allocated globals, expected: [%lu], actual: [%lu]",
+                         total_expected, allocator->amount_allocated);
 }
 
-size_t innit_frame_allocator(AllocatorInterface *allocator) {
+size_t server_innit_frame_allocator(ProgramContext *ctxt,
+                                    AllocatorInterface *allocator) {
   using frame_allocator_type =
       BucketAllocator<MAX_COROUTINE_AMOUNT, MAX_COROUTINE_SIZE>;
   const size_t frame_buffer_size =
@@ -88,10 +109,11 @@ size_t innit_frame_allocator(AllocatorInterface *allocator) {
   auto frame_allocator_ptr =
       (frame_allocator_type *)allocator->allocate(frame_allocator_size).value();
   new (frame_allocator_ptr) frame_allocator_type(frame_buffer);
-  program_coroutine_frame_allocator = frame_allocator_ptr;
+  ctxt->frame_allocator = frame_allocator_ptr;
   return frame_buffer_size + frame_allocator_size;
 }
-size_t innit_bucket_allocator(AllocatorInterface *allocator) {
+size_t server_innit_bucket_allocator(ProgramContext *ctxt,
+                                     AllocatorInterface *allocator) {
   using buffer_allocator_type =
       BucketAllocator<MAX_BUFFER_AMOUNT, MAX_BUFFER_SIZE>;
 
@@ -107,10 +129,11 @@ size_t innit_bucket_allocator(AllocatorInterface *allocator) {
       (buffer_allocator_type *)allocator->allocate(buffer_allocator_size)
           .value();
   new (buffer_allocator_ptr) buffer_allocator_type(buffer_ptr);
-  program_buffer_allocator = buffer_allocator_ptr;
+  ctxt->buffer_allocator = buffer_allocator_ptr;
   return buffer_buffer_size + buffer_allocator_size;
 }
-size_t innit_event_loop(AllocatorInterface *allocator) {
+size_t server_innit_event_loop(ProgramContext *ctxt,
+                               AllocatorInterface *allocator) {
   using coroutine_generator_allocator_type =
       BucketAllocator<MAX_COROUTINE_GENERATOR_AMOUNT,
                       MAX_COROUTINE_GENERATOR_SIZE>;
@@ -150,12 +173,13 @@ size_t innit_event_loop(AllocatorInterface *allocator) {
       (event_loop_type *)allocator->allocate(event_loop_size).value();
   new (event_loop_ptr)
       BasicEventLoop(ready_queue_ptr, staging_queue_ptr, gen_allocator_ptr);
-  program_loop = event_loop_ptr;
+  ctxt->loop = event_loop_ptr;
   return ready_queue_size + staging_queue_size + generator_buffer_size +
          coroutine_generator_allocator_size + event_loop_size;
 }
 
-size_t innit_deadline(AllocatorInterface *allocator) {
+size_t server_innit_deadline(ProgramContext *ctxt,
+                             AllocatorInterface *allocator) {
 
   const size_t deadline_size = sizeof(DeadlineIndexKeeper);
   using deadline_keeper_type = DeadlineMinHeap;
@@ -181,18 +205,27 @@ size_t innit_deadline(AllocatorInterface *allocator) {
       (deadline_keeper_type *)allocator->allocate(deadline_keeper_size).value();
   new (deadline_keeper_ptr) deadline_keeper_type(
       deadline_storage_ptr, MAX_DEADLINES, deadline_allocator_ptr);
-  program_deadline_keeper = deadline_keeper_ptr;
+  ctxt->deadline_tracker = deadline_keeper_ptr;
   return deadline_buffer_size + deadline_allocator_size +
          deadline_storage_size + deadline_keeper_size;
 }
-size_t innit_io(AllocatorInterface *allocator) {
+size_t server_innit_io(ProgramContext *ctxt, AllocatorInterface *allocator) {
   using io_type = LinuxIO;
 
   const size_t io_size = sizeof(io_type);
 
   auto linux_io_ptr = (io_type *)allocator->allocate(io_size).value();
   new (linux_io_ptr) io_type(MAX_QUEUE_DEPTH);
-  program_io = linux_io_ptr;
+  ctxt->io = linux_io_ptr;
 
   return io_size;
+}
+size_t server_innit_metrics(ProgramContext *ctxt,
+                            AllocatorInterface *allocator) {
+  using metric_type = LinuxMetric;
+  const size_t metric_size = sizeof(metric_type);
+  auto metric_ptr = (metric_type *)allocator->allocate(metric_size).value();
+  new (metric_ptr) metric_type();
+  ctxt->metrics = metric_ptr;
+  return metric_size;
 }

@@ -4,6 +4,7 @@
 #include "general/interfaces/storage/allocator.h"
 #include "general/interfaces/utility/logger.h"
 #include "general/misc/errors.h"
+#include "general/misc/shutdown.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -25,9 +26,9 @@ public:
   Bucket<bucket_size> *buffer;
   size_t total_memory;
   BucketAllocator(Bucket<bucket_size> *buffer);
-  std::expected<void *, int> allocate(size_t n) override;
-  std::expected<void, int> free(void *) override;
-  std::expected<void, int> print_bucket(void *);
+  std::expected<void *, ErrorWrapper> allocate(size_t n) override;
+  std::expected<void, ErrorWrapper> free(void *) override;
+  std::expected<void, ErrorWrapper> print_bucket(void *);
 };
 
 template <size_t bucket_count, size_t bucket_size>
@@ -45,22 +46,24 @@ BucketAllocator<bucket_count, bucket_size>::BucketAllocator(
 }
 
 template <size_t bucket_count, size_t bucket_size>
-std::expected<void, int>
+std::expected<void, ErrorWrapper>
 BucketAllocator<bucket_count, bucket_size>::print_bucket(void *bucket_ptr) {
   bool ptr_in_range =
       bucket_ptr >= this->buffer && bucket_ptr <= (this->buffer + bucket_count);
   if (!ptr_in_range) {
-    program_logger->log_err(ALLOCATOR_ERROR_TAG,
-                            "Attempt to print bucket ptr outside buffer");
-    return std::unexpected(CapacityError::OUTSIDE_RANGE);
+    program_ctxt->logger->log_err(ALLOCATOR_ERROR_TAG,
+                                  "Attempt to print bucket ptr outside buffer");
+    return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                                        .error = CapacityError::OUTSIDE_RANGE});
   }
 
   auto cur_bucket_ptr = (Bucket<bucket_size> *)bucket_ptr;
   if ((cur_bucket_ptr - this->buffer) % sizeof(Bucket<bucket_size>) != 0) {
-    program_logger->log_err(
+    program_ctxt->logger->log_err(
         ALLOCATOR_ERROR_TAG,
         "Attempt to print bucket ptr not aligned with bucket");
-    return std::unexpected(CapacityError::OUTSIDE_RANGE);
+    return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                                        .error = CapacityError::OUTSIDE_RANGE});
   }
 
   char out_str[sizeof(Bucket<bucket_size>) * 3 + 1];
@@ -69,19 +72,29 @@ BucketAllocator<bucket_count, bucket_size>::print_bucket(void *bucket_ptr) {
   }
 
   out_str[sizeof(Bucket<bucket_size>) * 3 - 1] = '\0';
-  program_logger->log_info(ALLOCATOR_TAG, "%s", out_str);
+  program_ctxt->logger->log_info(ALLOCATOR_TAG, "%s", out_str);
 
   return {};
 }
 
 template <size_t bucket_count, size_t bucket_size>
-std::expected<void *, int>
+std::expected<void *, ErrorWrapper>
 BucketAllocator<bucket_count, bucket_size>::allocate(size_t n) {
-  assert(n <= bucket_size);
+  if (n > bucket_size) {
+    program_ctxt->logger->log_err(
+        ALLOCATOR_ERROR_TAG,
+        "Attempt to allocate more than bucket size, bucket "
+        "size: [%lu], allocation amount: [%lu]",
+        bucket_size, n);
+    safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                               .error = CapacityError::BUFFER_OVERFLOW});
+  }
   if (this->free_bucket_header_ptr == nullptr) {
-    program_logger->log_err(ALLOCATOR_ERROR_TAG,
-                            "Attempt to allocate when no more buckets");
-    return std::unexpected(CapacityError::INSUFFICIENT_SPACE);
+    program_ctxt->logger->log_err(ALLOCATOR_ERROR_TAG,
+                                  "Attempt to allocate when no more buckets");
+    return std::unexpected(
+        ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                     .error = CapacityError::INSUFFICIENT_SPACE});
   }
   assert((this->amount_allocated + n) <= this->total_memory);
   this->allocated_buckets_count += 1;
@@ -91,11 +104,11 @@ BucketAllocator<bucket_count, bucket_size>::allocate(size_t n) {
 
   this->free_bucket_header_ptr = current_bucket_index->next_ptr;
   this->amount_allocated += n;
-  program_logger->log_debug(ALLOCATOR_TAG,
-                            "Allocated bucket, used bytes; [%lu]", n);
+  program_ctxt->logger->log_debug(ALLOCATOR_TAG,
+                                  "Allocated bucket, used bytes; [%lu]", n);
   if (this->allocated_buckets_count >
       bucket_count * ALLOCATOR_WARNING_THRESHOLD) {
-    program_logger->log_warning(
+    program_ctxt->logger->log_warning(
         ALLOCATOR_TAG,
         "Bucket allocator usage exceeded warning threshold, threshold: [%f]",
         ALLOCATOR_WARNING_THRESHOLD);
@@ -104,13 +117,14 @@ BucketAllocator<bucket_count, bucket_size>::allocate(size_t n) {
 }
 
 template <size_t bucket_count, size_t bucket_size>
-std::expected<void, int>
+std::expected<void, ErrorWrapper>
 BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
 
   if (this->allocated_buckets_count == 0) {
-    program_logger->log_err(ALLOCATOR_ERROR_TAG,
-                            "Attempt to free when none allocated");
-    return std::unexpected(CapacityError::BUFFER_UNDERFLOW);
+    program_ctxt->logger->log_err(ALLOCATOR_ERROR_TAG,
+                                  "Attempt to free when none allocated");
+    return std::unexpected(ErrorWrapper{
+        .tag = ErrorWrapper::CUSTOM, .error = CapacityError::BUFFER_UNDERFLOW});
   }
   auto start = reinterpret_cast<std::byte *>(this->buffer);
   auto end = start + bucket_count * sizeof(Bucket<bucket_size>);
@@ -118,9 +132,10 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
   bool ptr_in_range = ptr >= start && ptr < end;
 
   if (!ptr_in_range) {
-    program_logger->log_err(ALLOCATOR_ERROR_TAG,
-                            "Attempt to free address outside buffer");
-    return std::unexpected(CapacityError::OUTSIDE_RANGE);
+    program_ctxt->logger->log_err(ALLOCATOR_ERROR_TAG,
+                                  "Attempt to free address outside buffer");
+    return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                                        .error = CapacityError::OUTSIDE_RANGE});
   }
 
   auto cur_bucket_ptr = reinterpret_cast<Bucket<bucket_size> *>(bucket_ptr);
@@ -128,11 +143,12 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
                    reinterpret_cast<std::byte *>(this->buffer)) %
                   sizeof(Bucket<bucket_size>);
   if (offset != 0) {
-    program_logger->log_err(
+    program_ctxt->logger->log_err(
         ALLOCATOR_ERROR_TAG,
         "Attempt to free address not aligned with bucket, offset: [%lu]",
         offset);
-    return std::unexpected(CapacityError::OUTSIDE_RANGE);
+    return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                                        .error = CapacityError::OUTSIDE_RANGE});
   }
   size_t used_memory = cur_bucket_ptr->allocation_size;
   assert((this->amount_allocated - used_memory) >= 0);
@@ -141,8 +157,8 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
   this->allocated_buckets_count -= 1;
   cur_bucket_ptr->allocation_size = 0;
   this->amount_allocated -= used_memory;
-  program_logger->log_debug(ALLOCATOR_TAG, "Freed bucket, freed bytes: [%lu]",
-                            used_memory);
+  program_ctxt->logger->log_debug(
+      ALLOCATOR_TAG, "Freed bucket, freed bytes: [%lu]", used_memory);
   return {};
 }
 
