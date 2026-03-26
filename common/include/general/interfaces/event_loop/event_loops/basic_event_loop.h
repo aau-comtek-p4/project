@@ -5,6 +5,7 @@
 #include "general/interfaces/storage/allocator.h"
 #include "general/interfaces/storage/queue.h"
 #include <coroutine>
+#include <cstdint>
 
 class BasicEventLoop : public EventLoopInterface {
 private:
@@ -26,6 +27,8 @@ public:
 
   std::expected<void, ErrorWrapper> set_future(std::coroutine_handle<> handle,
                                                uint64_t future_tick) override;
+
+  std::expected<void, ErrorWrapper> run_step(uint64_t cqe_timeout);
   std::expected<void, ErrorWrapper> step() override;
   std::expected<void, ErrorWrapper> run() override;
   void stop() override;

@@ -13,7 +13,7 @@ struct DeadlineIndexKeeper;
 
 struct Deadline {
   std::coroutine_handle<> handle;
-  uint64_t deadline_ms;
+  uint64_t deadline_tick;
   DeadlineIndexKeeper *deadline_index;
   shared_promise_type *promise_type;
 };

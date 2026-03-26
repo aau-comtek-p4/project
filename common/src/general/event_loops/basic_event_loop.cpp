@@ -6,6 +6,8 @@
 #include "general/interfaces/utility/clock.h"
 #include "general/interfaces/utility/logger.h"
 #include "general/misc/errors.h"
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 
@@ -82,8 +84,8 @@ BasicEventLoop::set_future(std::coroutine_handle<> handle,
   return std::unexpected(res.error());
 }
 
-std::expected<void, ErrorWrapper> BasicEventLoop::step() {
-
+std::expected<void, ErrorWrapper>
+BasicEventLoop::run_step(uint64_t cqe_timeout) {
   std::swap(this->ready_queue, this->staging_queue);
   auto get_head_handle_res = this->ready_queue->deque();
   while (get_head_handle_res.has_value()) {
@@ -107,12 +109,22 @@ std::expected<void, ErrorWrapper> BasicEventLoop::step() {
                                   custom_strerror(res.error()));
   }
   program_ctxt->io->submit();
-  program_ctxt->io->process_cqe(program_ctxt->clock->time_untill_futute() *
-                                0.5);
+  program_ctxt->io->process_cqe(cqe_timeout);
+  return {};
+}
 
-  uint64_t start_time = program_ctxt->clock->spin_untill_future();
-  program_ctxt->clock->tick();
-  program_ctxt->clock->set_future_tick(start_time);
+std::expected<void, ErrorWrapper> BasicEventLoop::step() {
+
+  auto res = this->run_step(program_ctxt->clock->time_until_tick());
+
+  uint64_t missed_ticks = program_ctxt->clock->tick();
+
+  uint64_t remaining_steps = std::min(missed_ticks, (uint64_t)MAX_MISSED_TICK);
+
+  for (size_t i = 0; i < remaining_steps; i++) {
+    res = this->run_step(0);
+    program_ctxt->clock->tick_catchup();
+  }
   return {};
 }
 

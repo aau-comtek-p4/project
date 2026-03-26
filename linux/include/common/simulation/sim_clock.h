@@ -9,17 +9,16 @@ private:
   uint64_t tick_ns;
 
 public:
-  SimClock();
-  void tick() override;
+  SimClock(uint64_t tick_ns);
+  void setup() override;
+  uint64_t tick() override;
+  void tick_catchup() override;
   uint64_t rt_now() override;
   uint64_t tick_now() override;
-  void set_future_tick(uint64_t current_time) override;
-  void set_future_time(uint64_t time_until) override;
-  uint64_t time_untill_futute() override;
-  uint64_t spin_untill_future() override;
-  TimeStamp format_time() override;
-  uint64_t rt_since_start() override;
-  uint64_t get_time_pr_tick() override;
+  uint64_t time_until_tick() override;
+  uint64_t rt_since_start_ms() override;
+  uint64_t ms_pr_tick() override;
+  uint64_t ms_to_tick(uint64_t ms_time) override;
 };
 
 #endif

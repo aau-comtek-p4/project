@@ -1,34 +1,32 @@
 #include "common/simulation/sim_clock.h"
 #include "general/common.h"
+#include "general/interfaces/simulator/random.h"
+#include "general/interfaces/utility/clock.h"
 #include "general/interfaces/utility/logger.h"
 #include "general/interfaces/utility/metrics.h"
+#include <cstdint>
 
-SimClock::SimClock() : tick_ns(1) {};
-void SimClock::tick() { this->tick_count += 1; };
+SimClock::SimClock(uint64_t tick_ns) : tick_ns(tick_ns) {};
+void SimClock::tick_catchup() { this->tick_count += 1; }
+void SimClock::setup() {}
+uint64_t SimClock::tick() {
+  uint64_t missed_ticks = 0;
+  if (program_ctxt->random->inject_fault(RandomType::MISSED_TICK_CHANCE, 1)) {
+    missed_ticks =
+        program_ctxt->random->inject_value(RandomType::MISSED_TICK, 1);
+    program_ctxt->logger->log_warning(CLOCK_TAG, "Missed ticks: [%lu]",
+                                      missed_ticks);
+    program_ctxt->metrics->document_metric(MetricType::TICK_MISS);
+  }
+  this->tick_count += 1;
+  return missed_ticks;
+};
 uint64_t SimClock::rt_now() { return this->tick_count; };
-uint64_t SimClock::rt_since_start() { return this->tick_count; };
+uint64_t SimClock::rt_since_start_ms() { return this->tick_count; };
 uint64_t SimClock::tick_now() { return this->tick_count; };
-void SimClock::set_future_tick(uint64_t current_time) {};
-void SimClock::set_future_time(uint64_t time_until) {};
-uint64_t SimClock::time_untill_futute() { return 0; };
-uint64_t SimClock::spin_untill_future() { return this->tick_count; };
+uint64_t SimClock::time_until_tick() { return 0; }
 
-TimeStamp SimClock::format_time() {
-  uint64_t time_ns = this->rt_since_start();
-  uint64_t time_ms = time_ns / NS_PR_MS;
-  uint64_t time_s = time_ms / MS_PR_S;
-  uint64_t time_m = time_s / S_PR_M;
-  uint64_t time_h = time_m / M_PR_H;
-
-  TimeStamp time_stamp{
-      .time_ns = time_ns,
-      .time_ms = time_ns,
-      .time_s = time_s,
-      .time_m = time_m,
-      .time_h = time_h,
-  };
-
-  return time_stamp;
+uint64_t SimClock::ms_pr_tick() { return 1; }
+uint64_t SimClock::ms_to_tick(uint64_t time_ms) {
+  return time_ms / this->ms_pr_tick();
 }
-
-uint64_t SimClock::get_time_pr_tick() { return this->tick_ns; }

@@ -10,6 +10,8 @@ class AllocatorInterface;
 class DeadlineStorageInterface;
 class IOInterface;
 class MetricsInterface;
+class RandomInterface;
+
 struct ProgramContext {
   LoggerInterface *logger = nullptr;
   ClockInterface *clock = nullptr;
@@ -19,6 +21,7 @@ struct ProgramContext {
   DeadlineStorageInterface *deadline_tracker = nullptr;
   IOInterface *io = nullptr;
   MetricsInterface *metrics = nullptr;
+  RandomInterface *random = nullptr;
 };
 
 inline ProgramContext *program_ctxt = nullptr;

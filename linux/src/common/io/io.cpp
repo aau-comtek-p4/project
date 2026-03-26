@@ -56,6 +56,17 @@ public:
   void await_suspend(std::coroutine_handle<
                      Task<std::expected<int, ErrorWrapper>>::promise_type>
                          handle) {
+    if (handle.promise().cancelled) {
+      this->result = -ECANCELED;
+      auto res = program_ctxt->loop->enque_staging(handle);
+      if (!res.has_value()) {
+        program_ctxt->logger->log_err(IO_TAG,
+                                      "Cancelled IO failed to enque handle");
+        safe_shutdown(res.error());
+      }
+      return;
+    }
+
     handle.promise().io_address = this;
     this->handle = handle;
     struct io_uring_sqe *sqe = io_uring_get_sqe(this->ring);

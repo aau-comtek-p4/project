@@ -4,6 +4,7 @@
 #include "general/interfaces/utility/logger.h"
 #include <cstdarg>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <ctime>
 #include <unistd.h>
@@ -12,9 +13,9 @@ size_t FPrintLogger::print_tag(const char *prefix, const char *type_text,
                                const char *tag, char *out_buf,
                                size_t max_size) {
 
-  auto time_stamp = program_ctxt->clock->format_time();
+  uint64_t timestamp = program_ctxt->clock->rt_since_start_ms();
   size_t pre_size = snprintf(out_buf, max_size, "%s[%08lu] [%s] [%s]: ", prefix,
-                             time_stamp.time_ms, tag, type_text) +
+                             timestamp, tag, type_text) +
                     1;
   return pre_size;
 }

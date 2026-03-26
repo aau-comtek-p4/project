@@ -11,13 +11,13 @@
 #include <expected>
 template <typename T> struct TimeoutAwaiter {
   T routine;
-  uint64_t timeout;
+  uint64_t timeout_tick;
   using promise_type = T::promise_type;
   using return_type = T::value_type;
   std::coroutine_handle<promise_type> routine_handler;
   DeadlineIndexKeeper *deadline_index;
-  TimeoutAwaiter(T &&routine, uint64_t timeout)
-      : routine(std::move(routine)), timeout(timeout) {}
+  TimeoutAwaiter(T &&routine, uint64_t timeout_tick)
+      : routine(std::move(routine)), timeout_tick(timeout_tick) {}
 
   bool await_ready() { return false; }
   void await_suspend(std::coroutine_handle<> h) {
@@ -25,7 +25,7 @@ template <typename T> struct TimeoutAwaiter {
     this->routine_handler.promise().continuation = h;
     spawn(std::move(routine));
     auto res = program_ctxt->deadline_tracker->add_deadline(
-        h, &this->routine_handler.promise(), this->timeout);
+        h, &this->routine_handler.promise(), this->timeout_tick);
     if (!res.has_value()) {
       program_ctxt->logger->log_err(COROUTINE_TAG,
                                     "Failed to add deadline, error: [%s]",
@@ -46,9 +46,9 @@ template <typename T> struct TimeoutAwaiter {
   }
 };
 template <typename T>
-TimeoutAwaiter<T> run_with_timeout(T &&routine, uint64_t timeout) {
+TimeoutAwaiter<T> run_with_timeout(T &&routine, uint64_t timeout_tick) {
 
-  return TimeoutAwaiter<T>(std::move(routine), timeout);
+  return TimeoutAwaiter<T>(std::move(routine), timeout_tick);
 }
 
 #endif

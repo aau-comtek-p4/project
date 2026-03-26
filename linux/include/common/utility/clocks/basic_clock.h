@@ -16,16 +16,15 @@ private:
 
 public:
   BasickClock(clockid_t clock_id, uint64_t tick_ns);
-  void tick() override;
+  void setup() override;
+  uint64_t tick() override;
+  void tick_catchup() override;
   uint64_t rt_now() override;
   uint64_t tick_now() override;
-  void set_future_tick(uint64_t) override;
-  void set_future_time(uint64_t time_until) override;
-  uint64_t time_untill_futute() override;
-  uint64_t spin_untill_future() override;
-  TimeStamp format_time() override;
-  uint64_t rt_since_start() override;
-  uint64_t get_time_pr_tick() override;
+  uint64_t time_until_tick() override;
+  uint64_t rt_since_start_ms() override;
+  uint64_t ms_pr_tick() override;
+  uint64_t ms_to_tick(uint64_t ms_time) override;
 };
 
 #endif

@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-#define SIMULATION 1
+#define SIMULATION 0
 
 #if SIMULATION == 0
 #define NS_PR_MS 1000000
@@ -20,30 +20,19 @@
 #define CLOCK_TAG "CLOCK"
 #define CLOCK_ERROR_TAG "CLOCK ERROR"
 
-#define MISSED_TICK_WARNING_THRESHOLD 0.02
-
-struct TimeStamp {
-  uint64_t time_ns;
-  uint64_t time_ms;
-  uint64_t time_s;
-  uint64_t time_m;
-  uint64_t time_h;
-};
-
+#define MISSED_TICK_WARNING_THRESHOLD 0.50
+#define MAX_MISSED_TICK 2
 class ClockInterface {
 public:
-  virtual void tick() = 0;
+  virtual void setup() = 0;
+  virtual uint64_t tick() = 0;
+  virtual void tick_catchup() = 0;
   virtual uint64_t rt_now() = 0;
   virtual uint64_t tick_now() = 0;
-  virtual void set_future_tick(uint64_t current_time) = 0;
-  virtual void set_future_time(uint64_t time_until) = 0;
-  virtual uint64_t time_untill_futute() = 0;
-  virtual uint64_t spin_untill_future() = 0;
-  virtual uint64_t rt_since_start() = 0;
-  virtual uint64_t get_time_pr_tick() = 0;
-
-  virtual TimeStamp format_time() = 0;
+  virtual uint64_t time_until_tick() = 0;
+  virtual uint64_t rt_since_start_ms() = 0;
+  virtual uint64_t ms_pr_tick() = 0;
+  virtual uint64_t ms_to_tick(uint64_t ms_time) = 0;
 };
-uint64_t ms_to_tick(uint64_t time_ms);
 
 #endif

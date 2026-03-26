@@ -43,8 +43,7 @@ int main() {
                                  arena_size);
   node_init_ctxt(program_ctxt, &stack_allocator);
 
-  uint64_t start_time = program_ctxt->clock->spin_untill_future();
-  program_ctxt->clock->set_future_tick(start_time);
+  program_ctxt->clock->setup();
   auto _ = program_ctxt->loop->run();
   safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM, .error = 1});
 }

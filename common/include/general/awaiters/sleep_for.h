@@ -16,5 +16,5 @@ struct SkipAwaiter {
   void await_resume() {};
 };
 
-SkipAwaiter sleep_for(uint64_t timeout);
+SkipAwaiter sleep_for(uint64_t timeout_tick);
 #endif

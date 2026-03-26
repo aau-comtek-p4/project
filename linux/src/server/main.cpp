@@ -9,8 +9,11 @@
 #include "general/interfaces/event_loop/coroutines/job.h"
 #include "general/interfaces/event_loop/coroutines/task.h"
 #include "general/interfaces/io/io.h"
+#include "general/interfaces/simulator/random.h"
+#include "general/interfaces/simulator/random/seeded_random.h"
 #include "general/interfaces/storage/allocators/arena_allocator.h"
 #include "general/interfaces/utility/clock.h"
+#include "general/interfaces/utility/metrics.h"
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
 #include <cerrno>
@@ -76,13 +79,13 @@ Job server() {
 
   while (true) {
     program_ctxt->logger->log_info(SERVER_TAG, "Server accepting connections");
-    auto res =
-        co_await run_with_timeout(program_ctxt->io->accept(socket_fd), 11);
+    auto res = co_await run_with_timeout(program_ctxt->io->accept(socket_fd),
+                                         program_ctxt->clock->ms_to_tick(11));
     if (!res.has_value()) {
       program_ctxt->logger->log_err(SERVER_ERROR_TAG,
                                     "Server accept error: [%s]",
                                     custom_strerror(res.error()));
-      co_await sleep_for(2000);
+      co_await sleep_for(program_ctxt->clock->ms_to_tick(2000));
     } else {
       program_ctxt->logger->log_info(SERVER_TAG, "Got connection on fd: [%u]",
                                      res.value());
@@ -96,8 +99,8 @@ Job shutdown() {
 int main() {
   ProgramContext ctxt;
   program_ctxt = &ctxt;
-  // BasickClock clock(CLOCK_MONOTONIC, NS_PR_MS * CLOCK_MS_PR_TICK);
-  SimClock clock;
+  BasickClock clock(CLOCK_MONOTONIC, NS_PR_MS * CLOCK_MS_PR_TICK);
+  // SimClock clock(NS_PR_MS * CLOCK_MS_PR_TICK);
   program_ctxt->clock = &clock;
   FPrintLogger logger;
   program_ctxt->logger = &logger;
@@ -109,11 +112,14 @@ int main() {
   program_ctxt->logger->log_info(SERVER_TAG, "Created arena, size: [%lu]",
                                  arena_size);
   server_init_ctxt(program_ctxt, &stack_allocator);
+  SeededRandom random_seeded(5);
+  random_seeded.add_random_interval(RandomType::MISSED_TICK_CHANCE, 0, 0);
+  random_seeded.add_random_interval(RandomType::MISSED_TICK, 1, 3);
+  program_ctxt->random = &random_seeded;
 
   auto res = spawn(server());
-  res = spawn_future(shutdown(), 20000);
-  uint64_t start_time = program_ctxt->clock->spin_untill_future();
-  program_ctxt->clock->set_future_tick(start_time);
+  res = spawn_future(shutdown(), program_ctxt->clock->ms_to_tick(20000));
+  program_ctxt->clock->setup();
   res = program_ctxt->loop->run();
   safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM, .error = 1});
 }
