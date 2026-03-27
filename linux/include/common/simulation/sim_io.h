@@ -2,9 +2,32 @@
 #define SIM_IO_H
 
 #include "general/interfaces/io/io.h"
+#include "general/interfaces/storage/queue.h"
+#include <cstdint>
+
+#define SIM_MAX_IN_FLIGHT 100
+
+struct SimPacket {
+  uint8_t *data;
+  uint64_t data_len;
+  int src;
+  int dest;
+  uint64_t delivery_tick;
+  uint64_t send_tick;
+};
+
+struct SimSource {
+  bool accepting = false;
+  bool connected = false;
+  int backlog_limit;
+  QueueInterface<int> *backlog;
+  int fd = -1;
+};
+
 class SimIO : public IOInterface {
 private:
   size_t queue_depth;
+  SimPacket in_flight[SIM_MAX_IN_FLIGHT];
 
 public:
   SimIO(size_t queue_depth);

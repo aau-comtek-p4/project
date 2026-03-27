@@ -4,6 +4,7 @@
 #include "general/interfaces/utility/clock.h"
 #include "general/interfaces/utility/logger.h"
 #include "general/interfaces/utility/metrics.h"
+#include "general/misc/context.h"
 #include <cstdint>
 
 SimClock::SimClock(uint64_t tick_ns) : tick_ns(tick_ns) {};

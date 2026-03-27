@@ -12,7 +12,7 @@
 #define LOG_INFO_TEXT "INFO"
 #define LOG_ERROR_TEXT "ERROR"
 
-#define DEBUG_ON 0
+#define DEBUG_ON 1
 enum LogLevel {
   LOG_INFO,
   LOG_DEBUG,

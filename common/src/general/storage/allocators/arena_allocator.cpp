@@ -2,6 +2,7 @@
 #include "general/common.h"
 #include "general/interfaces/storage/allocator.h"
 #include "general/interfaces/utility/logger.h"
+#include "general/misc/context.h"
 #include "general/misc/errors.h"
 #include <cassert>
 #include <cstddef>

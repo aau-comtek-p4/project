@@ -2,6 +2,7 @@
 #include "general/common.h"
 #include "general/interfaces/utility/clock.h"
 #include "general/interfaces/utility/logger.h"
+#include "general/misc/context.h"
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>

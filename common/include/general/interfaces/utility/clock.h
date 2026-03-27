@@ -3,19 +3,10 @@
 
 #include <cstdint>
 
-#define SIMULATION 0
-
-#if SIMULATION == 0
 #define NS_PR_MS 1000000
 #define MS_PR_S 1000
 #define S_PR_M 60
 #define M_PR_H 60
-#else
-#define NS_PR_MS 1
-#define MS_PR_S 1
-#define S_PR_M 1
-#define M_PR_H 1
-#endif
 
 #define CLOCK_TAG "CLOCK"
 #define CLOCK_ERROR_TAG "CLOCK ERROR"

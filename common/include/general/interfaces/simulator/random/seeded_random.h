@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#pragma once
 struct RandomInterval {
   uint64_t min;
   uint64_t max;
@@ -11,7 +12,7 @@ class SeededRandom : public RandomInterface {
   uint64_t seed;
   uint64_t call_count;
   uint64_t hash(RandomType random_type, uint64_t ctx);
-  RandomInterval intervals[10];
+  RandomInterval intervals[RANDOM_TYPE_AMOUNT];
 
 public:
   SeededRandom(uint64_t seed);

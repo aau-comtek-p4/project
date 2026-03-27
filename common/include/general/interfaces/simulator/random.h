@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+#define RANDOM_TYPE_AMOUNT 5
+
 enum RandomType {
   NETWORK_LATENCY = 0,
   MISSED_TICK = 1,

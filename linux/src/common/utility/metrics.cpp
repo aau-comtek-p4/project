@@ -2,6 +2,7 @@
 #include "common/utility/metric.h"
 #include "general/common.h"
 #include "general/interfaces/utility/logger.h"
+#include "general/misc/context.h"
 #include "general/misc/shutdown.h"
 #include <cstddef>
 const char *get_metric_type(MetricType metric_type) {
