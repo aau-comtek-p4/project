@@ -95,7 +95,6 @@ BasicEventLoop::run_step(uint64_t cqe_timeout) {
         handler->resume();
       }
     } else {
-
       program_ctxt->logger->log_debug(EVENT_LOOP_TAG, "NULL handle");
     }
 
@@ -108,8 +107,8 @@ BasicEventLoop::run_step(uint64_t cqe_timeout) {
                                   "Failed to enforce deadlines, error: [%s]",
                                   custom_strerror(res.error()));
   }
-  program_ctxt->io->submit();
-  program_ctxt->io->process_cqe(cqe_timeout);
+  program_ctxt->io->submit_all();
+  program_ctxt->io->process_all(cqe_timeout);
   return {};
 }
 
@@ -127,6 +126,18 @@ std::expected<void, ErrorWrapper> BasicEventLoop::step() {
   }
   return {};
 }
+
+std::expected<void, ErrorWrapper> BasicEventLoop::run(uint64_t time) {
+  while (this->running && program_ctxt->clock->tick_now() < time) {
+    auto res = this->step();
+    if (!res.has_value()) {
+      program_ctxt->logger->log_err(
+          EVENT_LOOP_ERR_TAG, "Failed to take event loop step, error: [%s]",
+          custom_strerror(res.error()));
+    }
+  }
+  return {};
+};
 
 std::expected<void, ErrorWrapper> BasicEventLoop::run() {
   while (this->running) {

@@ -1,6 +1,10 @@
 #include "general/interfaces/simulator/random/seeded_random.h"
+#include "general/common.h"
 #include "general/interfaces/simulator/random.h"
+#include "general/interfaces/utility/logger.h"
+#include "general/misc/context.h"
 #include <cstdint>
+#include <cstdio>
 
 SeededRandom::SeededRandom(uint64_t seed) : seed(seed) {};
 
@@ -8,7 +12,7 @@ uint64_t SeededRandom::hash(RandomType random_type, uint64_t ctx) {
   // Splitmix64 random
   uint64_t x = seed ^ (((uint64_t)random_type + 1) * 0x9e3779b97f4a7c15) ^
                ((ctx + 1) * 0x6c62272e07bb0142) ^
-               ((call_count++ + 1) * 0xbf58476d1ce4e5b9);
+               ((this->call_counts[random_type]++ + 1) * 0xbf58476d1ce4e5b9);
   x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9;
   x = (x ^ (x >> 27)) * 0x94d049bb133111eb;
   return x ^ (x >> 31);

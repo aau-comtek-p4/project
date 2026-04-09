@@ -31,6 +31,7 @@ public:
   std::expected<void, ErrorWrapper> run_step(uint64_t cqe_timeout);
   std::expected<void, ErrorWrapper> step() override;
   std::expected<void, ErrorWrapper> run() override;
+  std::expected<void, ErrorWrapper> run(uint64_t timeout) override;
   void stop() override;
 };
 

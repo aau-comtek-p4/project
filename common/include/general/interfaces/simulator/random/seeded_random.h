@@ -10,9 +10,9 @@ struct RandomInterval {
 
 class SeededRandom : public RandomInterface {
   uint64_t seed;
-  uint64_t call_count;
   uint64_t hash(RandomType random_type, uint64_t ctx);
-  RandomInterval intervals[RANDOM_TYPE_AMOUNT];
+  RandomInterval intervals[RANDOM_TYPE_AMOUNT] = {};
+  uint64_t call_counts[RANDOM_TYPE_AMOUNT] = {};
 
 public:
   SeededRandom(uint64_t seed);

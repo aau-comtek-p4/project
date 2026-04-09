@@ -6,11 +6,11 @@
 class ArenaAllocator : public AllocatorInterface {
 private:
   uint8_t *buffer;
-  size_t buffer_size;
+  uint64_t buffer_size;
 
 public:
-  ArenaAllocator(uint8_t *buffer, size_t buffer_size);
-  std::expected<void *, ErrorWrapper> allocate(size_t n) override;
+  ArenaAllocator(uint8_t *buffer, uint64_t buffer_size);
+  std::expected<void *, ErrorWrapper> allocate(uint64_t n) override;
   std::expected<void, ErrorWrapper> free(void *) override;
 };
 #endif

@@ -4,21 +4,22 @@
 #include "general/interfaces/simulator/random.h"
 #include "general/interfaces/simulator/random/seeded_random.h"
 #include <cstdint>
-enum CtxtIOType {
-  LINUX,
-  SIM_IO,
-};
+#define CONTEXT_TAG "CONTEXT"
+#define CONTEXT_ERROR_TAG "CONTEXT ERROR"
 enum CtxtClockType {
   WALL,
   SIM_CLOCK,
 };
 enum CtxtLoggerType {
   FILE_LOGGER,
-  STDERR_LOGGER,
+  FWRITE_LOGGER,
+  DUMMY_LOGGER,
+  ESP_LOGGER,
 };
 enum CtxtDeadlineTrackerType {
   MIN_HEAP,
 };
+enum CtxtMetricType { STANDARD_METRIC };
 enum CtxtRandomType { SEEDED, NONE };
 enum ContextType {
   NODE,
@@ -38,15 +39,15 @@ struct ContextSettings {
   static constexpr uint64_t max_ready_queue = 0;
   static constexpr uint64_t max_staging_queue = 0;
   static constexpr uint64_t max_total_size = 0;
+  static constexpr uint64_t max_io_transport_size = 0;
 };
 template <typename Setting> struct ContextConfig {
   ContextType ctx_type;
-  CtxtIOType io_type;
   CtxtClockType clock_type;
   CtxtLoggerType logger_type;
   CtxtDeadlineTrackerType deadline_tracker_type;
   CtxtRandomType random_type;
-  RandomInterval random_intervals[RANDOM_TYPE_AMOUNT];
+  CtxtMetricType metric_type;
   Setting settings;
 };
 
@@ -57,7 +58,7 @@ struct ProgramContext {
   AllocatorInterface *frame_allocator = nullptr;
   AllocatorInterface *buffer_allocator = nullptr;
   DeadlineStorageInterface *deadline_tracker = nullptr;
-  IOInterface *io = nullptr;
+  IOHandler *io = nullptr;
   MetricsInterface *metrics = nullptr;
   RandomInterface *random = nullptr;
 };

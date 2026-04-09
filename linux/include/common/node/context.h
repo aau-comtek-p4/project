@@ -13,4 +13,5 @@ struct NodeContextSettings : public ContextSettings {
   static constexpr uint64_t max_buffer_amount = 20;
   static constexpr uint64_t max_deadlines = 20;
   static constexpr uint64_t max_queue_depth = 20;
+  static constexpr uint64_t max_io_transport_size = 1024;
 };

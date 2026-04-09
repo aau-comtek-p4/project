@@ -8,7 +8,11 @@
 #include <cstdint>
 
 SimClock::SimClock(uint64_t tick_ns) : tick_ns(tick_ns) {};
-void SimClock::tick_catchup() { this->tick_count += 1; }
+void SimClock::tick_catchup() {
+
+  // program_ctxt->metrics->document_metric(MetricType::REAL_TICK);
+  this->tick_count += 1;
+}
 void SimClock::setup() {}
 uint64_t SimClock::tick() {
   uint64_t missed_ticks = 0;
@@ -19,6 +23,7 @@ uint64_t SimClock::tick() {
                                       missed_ticks);
     program_ctxt->metrics->document_metric(MetricType::TICK_MISS);
   }
+  program_ctxt->metrics->document_metric(MetricType::REAL_TICK);
   this->tick_count += 1;
   return missed_ticks;
 };

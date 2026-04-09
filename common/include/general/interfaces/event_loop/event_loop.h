@@ -23,6 +23,7 @@ public:
 
   virtual std::expected<void, ErrorWrapper> step() = 0;
   virtual std::expected<void, ErrorWrapper> run() = 0;
+  virtual std::expected<void, ErrorWrapper> run(uint64_t timeout) = 0;
   virtual void stop() = 0;
 };
 

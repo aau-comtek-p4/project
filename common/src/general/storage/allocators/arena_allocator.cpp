@@ -5,16 +5,17 @@
 #include "general/misc/context.h"
 #include "general/misc/errors.h"
 #include <cassert>
+#include <cinttypes>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
 
-ArenaAllocator::ArenaAllocator(uint8_t *buffer, size_t buffer_size)
+ArenaAllocator::ArenaAllocator(uint8_t *buffer, uint64_t buffer_size)
     : buffer(buffer), buffer_size(buffer_size) {
   this->amount_allocated = 0;
 }
 
-std::expected<void *, ErrorWrapper> ArenaAllocator::allocate(size_t n) {
+std::expected<void *, ErrorWrapper> ArenaAllocator::allocate(uint64_t n) {
   if (this->amount_allocated + n >= this->buffer_size) {
     program_ctxt->logger->log_err(
         ALLOCATOR_ERROR_TAG,
@@ -25,7 +26,8 @@ std::expected<void *, ErrorWrapper> ArenaAllocator::allocate(size_t n) {
   }
   void *current_ptr = this->buffer + this->amount_allocated;
   this->amount_allocated += n;
-  program_ctxt->logger->log_debug(ALLOCATOR_TAG, "Arena allocated: [%lu]", n);
+  program_ctxt->logger->log_debug(ALLOCATOR_TAG,
+                                  "Arena allocated: [%" PRIu64 "]", n);
   if (this->amount_allocated >
       this->buffer_size * ALLOCATOR_WARNING_THRESHOLD) {
     program_ctxt->logger->log_warning(

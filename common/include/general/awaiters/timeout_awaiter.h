@@ -3,45 +3,48 @@
 #include "general/common.h"
 #include "general/interfaces/event_loop/co_routine.h"
 #include "general/interfaces/event_loop/coroutines/job.h"
+#include "general/interfaces/event_loop/coroutines/task.h"
 #include "general/interfaces/event_loop/deadline_keeper.h"
+#include "general/interfaces/io/io.h"
 #include "general/interfaces/utility/logger.h"
 #include "general/misc/context.h"
 #include "general/misc/errors.h"
 #include <coroutine>
 #include <cstdint>
 #include <expected>
+
+Task<int> timeout_routine(const void *cancel_data);
 template <typename T> struct TimeoutAwaiter {
   T routine;
   uint64_t timeout_tick;
   using promise_type = T::promise_type;
   using return_type = T::value_type;
+  std::coroutine_handle<Task<int>::promise_type> timeout_handle;
   std::coroutine_handle<promise_type> routine_handler;
-  DeadlineIndexKeeper *deadline_index;
   TimeoutAwaiter(T &&routine, uint64_t timeout_tick)
       : routine(std::move(routine)), timeout_tick(timeout_tick) {}
 
   bool await_ready() { return false; }
-  void await_suspend(std::coroutine_handle<> h) {
+  template <typename Promise>
+  void await_suspend(std::coroutine_handle<Promise> h) {
     this->routine_handler = routine.handle;
-    this->routine_handler.promise().continuation = h;
+    this->routine_handler.promise().ctxt.parent_ctxt = &h.promise().ctxt;
     spawn(std::move(routine));
-    auto res = program_ctxt->deadline_tracker->add_deadline(
-        h, &this->routine_handler.promise(), this->timeout_tick);
-    if (!res.has_value()) {
-      program_ctxt->logger->log_err(COROUTINE_TAG,
-                                    "Failed to add deadline, error: [%s]",
-                                    custom_strerror(res.error()));
-    }
-    this->deadline_index = res.value();
+    auto timeouter =
+        timeout_routine(this->routine_handler.promise().ctxt.io_address);
+    this->timeout_handle = timeouter.handle;
+    this->timeout_handle.promise().ctxt.parent_ctxt = &h.promise().ctxt;
+    spawn_future(std::move(timeouter), this->timeout_tick);
   }
 
-  return_type await_resume() {
+  std::expected<return_type, ErrorWrapper> await_resume() {
     if (this->routine_handler.done()) {
-      this->deadline_index->cancelled = true;
+      this->timeout_handle.promise().ctxt.cancelled = true;
       return_type res = this->routine_handler.promise().result;
       return res;
     }
-    this->routine_handler.promise().cancelled = true;
+    program_ctxt->metrics->document_metric(MetricType::SURPASSED_DEADLINE);
+    this->routine_handler.promise().ctxt.cancelled = true;
     return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
                                         .error = TimeoutError::TIMEOUT});
   }

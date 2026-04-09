@@ -7,32 +7,13 @@
 #include <cstdint>
 #include <liburing.h>
 
-class LinuxIO : public IOInterface {
-private:
-  io_uring ring;
-  size_t queue_depth;
-
-public:
-  LinuxIO(size_t queue_depth);
-  Task<std::expected<int, ErrorWrapper>> read(int id, uint8_t *out_buf,
-                                              size_t max_read) override;
-  Task<std::expected<int, ErrorWrapper>> write(int id, uint8_t *in_buf,
-                                               size_t write_amount) override;
-  Task<std::expected<int, ErrorWrapper>> open(const char *path, int flags,
-                                              mode_t mode) override;
-  Task<std::expected<int, ErrorWrapper>> close(int fd) override;
-  Task<std::expected<int, ErrorWrapper>> accept(int id) override;
-  Task<std::expected<int, ErrorWrapper>> recv(int sock_fd, uint8_t *buf,
-                                              size_t len) override;
-  Task<std::expected<int, ErrorWrapper>> send(int sock_fd, uint8_t *buf,
-                                              size_t len) override;
-  Task<std::expected<int, ErrorWrapper>>
-  connect(int sock_fd, sockaddr_in server_addr) override;
-
-  void cancel(const void *user_data) override;
-
-  void submit() override;
-  void process_cqe(uint64_t timeout_ns) override;
+struct IOAddress {
+  enum { IO_SOCKADDR, FILE_DESCRIPTOR, FILE_PATH } addr_type;
+  union {
+    sockaddr_in sockaddr;
+    int fd;
+    char file_path[30];
+  };
 };
 
 #endif

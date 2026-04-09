@@ -28,13 +28,13 @@ enum MetricType {
   CLOSED_FD,
   CLOSED_FAILED,
   DISCONNECT,
-
+  REAL_TICK,
 };
 
 class MetricsInterface {
 public:
   virtual void document_metric(MetricType metric_type) = 0;
-  virtual size_t get_metric(MetricType metric_type) = 0;
+  virtual uint64_t get_metric(MetricType metric_type) = 0;
   virtual void print_metrics() = 0;
 };
 

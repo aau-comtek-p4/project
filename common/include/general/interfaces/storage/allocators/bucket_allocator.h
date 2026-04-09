@@ -6,33 +6,34 @@
 #include "general/misc/context.h"
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
+#include <cinttypes>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
 
-template <size_t bucket_size> struct Bucket {
+template <uint64_t bucket_size> struct Bucket {
   std::byte buffer[bucket_size];
   size_t allocation_size;
   Bucket<bucket_size> *next_ptr;
 };
 
-template <size_t bucket_count, size_t bucket_size>
+template <uint64_t bucket_count, uint64_t bucket_size>
 class BucketAllocator : public AllocatorInterface {
 private:
-  size_t allocated_buckets_count;
+  uint64_t allocated_buckets_count;
   Bucket<bucket_size> *free_bucket_header_ptr;
 
 public:
   Bucket<bucket_size> *buffer;
-  size_t total_memory;
+  uint64_t total_memory;
   BucketAllocator(Bucket<bucket_size> *buffer);
-  std::expected<void *, ErrorWrapper> allocate(size_t n) override;
+  std::expected<void *, ErrorWrapper> allocate(uint64_t n) override;
   std::expected<void, ErrorWrapper> free(void *) override;
   std::expected<void, ErrorWrapper> print_bucket(void *);
 };
 
-template <size_t bucket_count, size_t bucket_size>
+template <uint64_t bucket_count, uint64_t bucket_size>
 BucketAllocator<bucket_count, bucket_size>::BucketAllocator(
     Bucket<bucket_size> *buffer) {
   this->buffer = buffer;
@@ -46,7 +47,7 @@ BucketAllocator<bucket_count, bucket_size>::BucketAllocator(
   this->buffer[bucket_count - 1].next_ptr = nullptr;
 }
 
-template <size_t bucket_count, size_t bucket_size>
+template <uint64_t bucket_count, uint64_t bucket_size>
 std::expected<void, ErrorWrapper>
 BucketAllocator<bucket_count, bucket_size>::print_bucket(void *bucket_ptr) {
   bool ptr_in_range =
@@ -68,7 +69,7 @@ BucketAllocator<bucket_count, bucket_size>::print_bucket(void *bucket_ptr) {
   }
 
   char out_str[sizeof(Bucket<bucket_size>) * 3 + 1];
-  for (size_t index = 0; index < sizeof(Bucket<bucket_size>); index++) {
+  for (uint64_t index = 0; index < sizeof(Bucket<bucket_size>); index++) {
     snprintf(&out_str[index * 3], 4, "%02X,", ((uint8_t *)bucket_ptr)[index]);
   }
 
@@ -78,14 +79,14 @@ BucketAllocator<bucket_count, bucket_size>::print_bucket(void *bucket_ptr) {
   return {};
 }
 
-template <size_t bucket_count, size_t bucket_size>
+template <uint64_t bucket_count, uint64_t bucket_size>
 std::expected<void *, ErrorWrapper>
-BucketAllocator<bucket_count, bucket_size>::allocate(size_t n) {
+BucketAllocator<bucket_count, bucket_size>::allocate(uint64_t n) {
   if (n > bucket_size) {
     program_ctxt->logger->log_err(
         ALLOCATOR_ERROR_TAG,
         "Attempt to allocate more than bucket size, bucket "
-        "size: [%lu], allocation amount: [%lu]",
+        "size: [%" PRIu64 "], allocation amount: [%" PRIu64 "]",
         bucket_size, n);
     safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
                                .error = CapacityError::BUFFER_OVERFLOW});
@@ -105,8 +106,8 @@ BucketAllocator<bucket_count, bucket_size>::allocate(size_t n) {
 
   this->free_bucket_header_ptr = current_bucket_index->next_ptr;
   this->amount_allocated += n;
-  program_ctxt->logger->log_debug(ALLOCATOR_TAG,
-                                  "Allocated bucket, used bytes; [%lu]", n);
+  program_ctxt->logger->log_debug(
+      ALLOCATOR_TAG, "Allocated bucket, used bytes; [%" PRIu64 "]", n);
   if (this->allocated_buckets_count >
       bucket_count * ALLOCATOR_WARNING_THRESHOLD) {
     program_ctxt->logger->log_warning(
@@ -117,7 +118,7 @@ BucketAllocator<bucket_count, bucket_size>::allocate(size_t n) {
   return current_bucket_index;
 }
 
-template <size_t bucket_count, size_t bucket_size>
+template <uint64_t bucket_count, uint64_t bucket_size>
 std::expected<void, ErrorWrapper>
 BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
 
@@ -140,26 +141,26 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
   }
 
   auto cur_bucket_ptr = reinterpret_cast<Bucket<bucket_size> *>(bucket_ptr);
-  size_t offset = (reinterpret_cast<std::byte *>(cur_bucket_ptr) -
-                   reinterpret_cast<std::byte *>(this->buffer)) %
-                  sizeof(Bucket<bucket_size>);
+  uint64_t offset = (reinterpret_cast<std::byte *>(cur_bucket_ptr) -
+                     reinterpret_cast<std::byte *>(this->buffer)) %
+                    sizeof(Bucket<bucket_size>);
   if (offset != 0) {
     program_ctxt->logger->log_err(
         ALLOCATOR_ERROR_TAG,
-        "Attempt to free address not aligned with bucket, offset: [%lu]",
+        "Attempt to free address not aligned with bucket, offset: [%" PRIu64
+        "]",
         offset);
     return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
                                         .error = CapacityError::OUTSIDE_RANGE});
   }
-  size_t used_memory = cur_bucket_ptr->allocation_size;
-  assert((this->amount_allocated - used_memory) >= 0);
+  uint64_t used_memory = cur_bucket_ptr->allocation_size;
   cur_bucket_ptr->next_ptr = this->free_bucket_header_ptr;
   this->free_bucket_header_ptr = cur_bucket_ptr;
   this->allocated_buckets_count -= 1;
   cur_bucket_ptr->allocation_size = 0;
   this->amount_allocated -= used_memory;
   program_ctxt->logger->log_debug(
-      ALLOCATOR_TAG, "Freed bucket, freed bytes: [%lu]", used_memory);
+      ALLOCATOR_TAG, "Freed bucket, freed bytes: [%" PRIu64 "]", used_memory);
   return {};
 }
 

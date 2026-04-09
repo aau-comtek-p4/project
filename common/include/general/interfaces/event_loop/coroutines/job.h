@@ -11,7 +11,9 @@
 #include "general/misc/shutdown.h"
 #include <algorithm>
 #include <cerrno>
+#include <cinttypes>
 #include <coroutine>
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <system_error>
@@ -29,7 +31,7 @@ template <typename T> std::expected<void, ErrorWrapper> spawn(T &&routine) {
   }
   T *ptr = new (res.value()) T(std::move(routine));
 
-  typed_handle.promise().self_cancellation = ptr;
+  typed_handle.promise().ctxt.self_cancellation = ptr;
   std::coroutine_handle<> handle = typed_handle;
   auto enqueue_res = program_ctxt->loop->enque_staging(std::move(handle));
   if (enqueue_res.has_value()) {
@@ -57,7 +59,7 @@ std::expected<void, ErrorWrapper> spawn_future(T &&routine,
   }
 
   T *ptr = new (res.value()) T(std::move(routine));
-  typed_handle.promise().self_cancellation = ptr;
+  typed_handle.promise().ctxt.self_cancellation = ptr;
   std::coroutine_handle<> handle = typed_handle;
   auto set_future_res =
       program_ctxt->loop->set_future(std::move(handle), future_tick_offset);
@@ -85,12 +87,15 @@ public:
 };
 
 struct Job::promise_type : public shared_promise_type {
-  size_t id;
-  promise_type() {
-    id = program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE);
+  promise_type() {};
+  auto get_return_object() {
+    auto h = handle_type::from_promise(*this);
+    this->ctxt.handle = h;
+    this->ctxt.id =
+        program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE);
     program_ctxt->metrics->document_metric(MetricType::TOTAL_COROUTINE);
-  };
-  auto get_return_object() { return Job(handle_type::from_promise(*this)); }
+    return Job(h);
+  }
 
   void return_void() {}
 
@@ -105,9 +110,8 @@ struct Job::promise_type : public shared_promise_type {
 
   std::suspend_always initial_suspend() { return {}; }
   std::suspend_never final_suspend() noexcept {
-    void *gen_alloc = this->self_cancellation;
-    if (this->self_cancellation) {
-      auto res = program_ctxt->loop->free(gen_alloc);
+    if (this->ctxt.self_cancellation) {
+      auto res = program_ctxt->loop->free(this->ctxt.self_cancellation);
       program_ctxt->logger->log_debug(COROUTINE_TAG, "Job freeing generator");
       if (!res.has_value()) {
 
@@ -129,8 +133,11 @@ struct Job::promise_type : public shared_promise_type {
       safe_shutdown(res.error());
     }
     program_ctxt->logger->log_debug(
-        COROUTINE_TAG, "Created job task id [%lu], space required: [%lu] bytes",
-        program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE), n);
+        COROUTINE_TAG,
+        "Created job task id [%" PRIu64 "], space required: [%" PRIu64
+        "] bytes",
+        program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE),
+        (uint64_t)n);
     return res.value();
   }
 

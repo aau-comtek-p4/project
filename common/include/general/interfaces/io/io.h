@@ -1,28 +1,20 @@
 #ifndef IO_INTERFACE_H
 #define IO_INTERFACE_H
 #include "general/interfaces/event_loop/coroutines/task.h"
+#include "general/interfaces/storage/allocator.h"
+#include "general/interfaces/storage/allocators/bucket_allocator.h"
 #include "general/misc/errors.h"
 #include "netinet/in.h"
-#include <bits/types/struct_iovec.h>
 #include <coroutine>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <sys/types.h>
 
 #define IO_TAG "IO"
 #define IO_ERROR_TAG "IO ERROR"
 
-enum IOType {
-  READ,
-  WRITE,
-  OPEN,
-  CLOSE,
-  ACCEPT,
-  RECV,
-  SEND,
-  CONNECT,
-};
 class IOAwaitInterface {
 public:
   std::coroutine_handle<> handle;
@@ -36,29 +28,56 @@ public:
   virtual int await_resume() = 0;
 };
 
-class IOInterface {
-public:
-  virtual Task<std::expected<int, ErrorWrapper>> read(int id, uint8_t *out_buf,
-                                                      size_t max_read) = 0;
-  virtual Task<std::expected<int, ErrorWrapper>> write(int id, uint8_t *in_buf,
-                                                       size_t write_amount) = 0;
-  virtual Task<std::expected<int, ErrorWrapper>>
-  open(const char *path, int flags, mode_t mode) = 0;
-  virtual Task<std::expected<int, ErrorWrapper>> close(int fd) = 0;
-
-  virtual Task<std::expected<int, ErrorWrapper>> accept(int id) = 0;
-  virtual Task<std::expected<int, ErrorWrapper>> recv(int sock_fd, uint8_t *buf,
-                                                      size_t len) = 0;
-
-  virtual Task<std::expected<int, ErrorWrapper>> send(int sock_fd, uint8_t *buf,
-                                                      size_t len) = 0;
-
-  virtual Task<std::expected<int, ErrorWrapper>>
-  connect(int sock_fd, sockaddr_in server_addr) = 0;
-
-  virtual void cancel(const void *user_data) = 0;
-  virtual void submit() = 0;
-  virtual void process_cqe(uint64_t timeout_ns) = 0;
+enum IOType {
+  READ,
+  WRITE,
+  OPEN,
+  CLOSE,
+  ACCEPT,
+  RECV,
+  SEND,
+  CONNECT,
+};
+enum IOMethod {
+  IO_WIFI_TCP = 0,
+  IO_WIFI_UDP = 1,
+  IO_ESP_NOW = 2,
+  IO_SERIAL = 3,
+  IO_GPIO = 4,
+  IO_FILE = 5,
+  IO_END = 6,
 };
 
+class IOTransport {
+public:
+  virtual void cancel(const void *user_data) = 0;
+  virtual void submit() = 0;
+  virtual void process(uint64_t timeout) = 0;
+};
+
+struct IOTransportWrapper {
+  std::optional<IOTransport *> transport_ptr;
+};
+
+struct IOAddress;
+class IOHandler {
+private:
+  AllocatorInterface *transport_allocator;
+  IOTransportWrapper transports[IO_END];
+
+public:
+  IOHandler(AllocatorInterface *transport_allocator);
+  IOTransport *register_transport(IOMethod io_method, uint64_t transport_size);
+  template <typename T> T *get_transport(IOMethod io_method);
+  void submit_all();
+  void process_all(uint64_t timeout);
+  void cancel(const void *user_data);
+};
+
+template <typename T> T *IOHandler::get_transport(IOMethod io_method) {
+  T *transport_ptr = (T *)this->transports[io_method].transport_ptr.value();
+  return transport_ptr;
+}
+
+const char *get_io_type(IOType type);
 #endif

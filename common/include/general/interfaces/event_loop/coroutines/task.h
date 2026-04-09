@@ -12,8 +12,10 @@
 #include "general/misc/shutdown.h"
 #include <cassert>
 #include <cerrno>
+#include <cinttypes>
 #include <coroutine>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <exception>
 #include <expected>
@@ -52,7 +54,7 @@ template <typename T>
 template <typename U>
 std::coroutine_handle<>
 Task<T>::await_suspend(std::coroutine_handle<U> caller) {
-  this->handle.promise().continuation = caller;
+  this->handle.promise().ctxt.parent_ctxt = &caller.promise().ctxt;
   return this->handle;
 }
 
@@ -82,35 +84,27 @@ class IOAwaitInterface;
 template <typename T>
 struct Task<T>::promise_type : public shared_promise_type {
   T result;
-  size_t id;
-  std::coroutine_handle<> continuation = nullptr;
 
-  promise_type() {
-    id = program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE);
-    program_ctxt->metrics->document_metric(MetricType::TOTAL_COROUTINE);
-  };
+  promise_type() {};
   struct FinalAwaiter {
     bool await_ready() noexcept { return false; }
-    void
-    await_suspend(std::coroutine_handle<promise_type> own_handler) noexcept {
-      std::coroutine_handle<> continuation_handler =
-          own_handler.promise().continuation;
-      if (!own_handler.promise().cancelled && continuation_handler) {
-        auto res = program_ctxt->loop->enque_staging(continuation_handler);
-        if (res.has_value()) {
-          return;
+    void await_suspend(
+        std::coroutine_handle<Task<T>::promise_type> own_handler) noexcept {
+      CoRoutineCtxt *own_ctxt = &own_handler.promise().ctxt;
+      CoRoutineCtxt *parent_ctxt = own_ctxt->parent_ctxt;
+      if (parent_ctxt && !own_ctxt->cancelled) {
+        auto res = program_ctxt->loop->enque_staging(parent_ctxt->handle);
+        if (!res.has_value()) {
+          program_ctxt->logger->log_err(
+              COROUTINE_ERR_TAG,
+              "Task id [%" PRIu64
+              "] failed to enque continuation, received error [%s]",
+              own_handler.promise().ctxt.id, custom_strerror(res.error()));
+          safe_shutdown(res.error());
         }
-        program_ctxt->logger->log_err(
-            COROUTINE_ERR_TAG,
-            "Task id [%lu] failed to enque continuation, received error [%s]",
-            own_handler.promise().id, custom_strerror(res.error()));
-        safe_shutdown(res.error());
       }
-      if (own_handler.promise().cancelled) {
-        program_ctxt->metrics->document_metric(MetricType::SURPASSED_DEADLINE);
-      }
-      if (own_handler.promise().self_cancellation) {
-        void *gen_alloc = own_handler.promise().self_cancellation;
+      if (own_ctxt->self_cancellation) {
+        void *gen_alloc = own_ctxt->self_cancellation;
         auto res = program_ctxt->loop->free(gen_alloc);
         program_ctxt->logger->log_debug(COROUTINE_TAG,
                                         "Task freeing generator");
@@ -126,7 +120,14 @@ struct Task<T>::promise_type : public shared_promise_type {
     }
     void await_resume() noexcept {}
   };
-  auto get_return_object() { return Task<T>(handle_type::from_promise(*this)); }
+  auto get_return_object() {
+    auto h = handle_type::from_promise(*this);
+    this->ctxt.handle = h;
+    this->ctxt.id =
+        program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE);
+    program_ctxt->metrics->document_metric(MetricType::TOTAL_COROUTINE);
+    return Task<T>(h);
+  }
 
   void return_value(T val) { this->result = val; }
 
@@ -150,8 +151,11 @@ struct Task<T>::promise_type : public shared_promise_type {
       safe_shutdown(res.error());
     }
     program_ctxt->logger->log_debug(
-        COROUTINE_TAG, "Created new task id [%lu], space required: [%lu] bytes",
-        program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE), n);
+        COROUTINE_TAG,
+        "Created new task id [%" PRIu64 "], space required: [%" PRIu64
+        "] bytes",
+        program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE),
+        (uint64_t)n);
     return res.value();
   }
 

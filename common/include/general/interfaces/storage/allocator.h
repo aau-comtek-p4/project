@@ -4,6 +4,7 @@
 #include "general/misc/errors.h"
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <expected>
 
@@ -12,8 +13,8 @@
 #define ALLOCATOR_WARNING_THRESHOLD 0.8
 class AllocatorInterface {
 public:
-  size_t amount_allocated;
-  virtual std::expected<void *, ErrorWrapper> allocate(size_t n) = 0;
+  uint64_t amount_allocated;
+  virtual std::expected<void *, ErrorWrapper> allocate(uint64_t n) = 0;
   virtual std::expected<void, ErrorWrapper> free(void *) = 0;
 };
 

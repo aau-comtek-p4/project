@@ -7,7 +7,7 @@ class ClockInterface;
 class EventLoopInterface;
 class AllocatorInterface;
 class DeadlineStorageInterface;
-class IOInterface;
+class IOHandler;
 class MetricsInterface;
 class RandomInterface;
 
