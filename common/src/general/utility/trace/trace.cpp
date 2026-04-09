@@ -32,6 +32,7 @@ void Trace::start() {
   this->start_time_ns = program_ctxt->clock->rt_since_start_ns();
   this->last_suspend_ns = this->start_time_ns;
 }
+void Trace::end() { this->started = false; }
 void Trace::suspend_trace() {
   if (this->started) {
     uint64_t additional_time =
@@ -116,6 +117,7 @@ Trace *TraceHandler::get_trace() {
     safe_shutdown(res.error());
   }
   auto trace_ptr = (Trace *)res.value();
+  new (trace_ptr) Trace();
   return trace_ptr;
 }
 void TraceHandler::clear_trace(Trace *root) {

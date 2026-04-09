@@ -48,22 +48,33 @@ Task<int> lazy_task() {
   co_return 0;
 }
 Job test_job() {
-  program_ctxt->logger->log_info(NODE_TAG, "I have started");
   CoRoutineCtxt *self_ctxt = co_await get_ctxt();
   self_ctxt->trace->start();
   self_ctxt->trace->set_name("Test job");
 
-  program_ctxt->logger->log_info(NODE_TAG, "My id is: [%lu]", self_ctxt->id);
-
-  program_ctxt->logger->log_info(NODE_TAG, "Starting timeout");
   auto res = co_await run_with_timeout(lazy_task(),
                                        program_ctxt->clock->ms_to_tick(3000));
-  if (res.has_value()) {
-    program_ctxt->logger->log_info(NODE_TAG, "Task finished sucessfully");
-  }
   co_await sleep_for(program_ctxt->clock->ms_to_tick(1000));
-  self_ctxt->trace->print();
-  program_ctxt->trace_handler->clear_trace(self_ctxt->trace);
+}
+Job write_file(const char *file_name, const char *buf, uint64_t buf_size) {
+  CoRoutineCtxt *self_ctxt = co_await get_ctxt();
+  self_ctxt->trace->start();
+  self_ctxt->trace->set_name("Write file");
+
+  auto transport =
+      program_ctxt->io->get_transport<StorageIOTransport>(IOMethod::IO_FILE);
+
+  IOAddress file_path_addr{.addr_type = IOAddress::FILE_PATH};
+  strncpy(file_path_addr.file_path, file_name, 30);
+  auto fd = (co_await transport->io_open(file_path_addr)).value();
+  IOAddress io_addr{.addr_type = IOAddress::FILE_DESCRIPTOR, .fd = fd};
+  auto bytes_written =
+      (co_await transport->io_write(io_addr, (uint8_t *)buf, strlen(buf)))
+          .value();
+  program_ctxt->logger->log_info(NODE_TAG, "Written [%i] bytes", bytes_written);
+  auto res = (co_await transport->io_close(io_addr)).value();
+
+  program_ctxt->logger->log_info(NODE_TAG, "File close res: [%i] ", res);
 }
 int main() {
   std::signal(SIGINT, handle_sigint);
@@ -84,7 +95,89 @@ int main() {
       BlockingFileWriteIOTransport(5);
 
   auto _ = spawn(detect_ctrl_c());
+  const char *buf =
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+      "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+      "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+      "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+      "mollit anim id est laborum."
+
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+      "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+      "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+      "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+      "mollit anim id est laborum."
+
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+      "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+      "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+      "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+      "mollit anim id est laborum."
+
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+      "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+      "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+      "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+      "mollit anim id est laborum."
+
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+      "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+      "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+      "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+      "mollit anim id est laborum."
+
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+      "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+      "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+      "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+      "mollit anim id est laborum."
+
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+      "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+      "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+      "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+      "mollit anim id est laborum."
+
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+      "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+      "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+      "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+      "mollit anim id est laborum."
+
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+      "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+      "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+      "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+      "mollit anim id est laborum."
+
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+      "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+      "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+      "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+      "mollit anim id est laborum.\0";
+  uint64_t buf_len = strlen(buf);
   _ = spawn(test_job());
+  _ = spawn(write_file("test.txt", buf, buf_len));
   _ = spawn_future(lazy_task(), program_ctxt->clock->ms_to_tick(2000));
 
   program_ctxt->clock->setup();

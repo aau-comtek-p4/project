@@ -1,6 +1,7 @@
 #include "common/io/io.h"
 #include "common/io/transports/storage/blocking_file_write.h"
 #include "general/common.h"
+#include "general/interfaces/event_loop/co_routine.h"
 #include "general/interfaces/event_loop/coroutines/task.h"
 #include "general/interfaces/event_loop/event_loop.h"
 #include "general/interfaces/io/io.h"
@@ -224,6 +225,9 @@ void BlockingFileWriteIOTransport::cancel(const void *user_data) {}
 
 Task<std::expected<int, ErrorWrapper>>
 BlockingFileWriteIOTransport::io_open(IOAddress addr) {
+  auto self_ctxt = co_await get_ctxt();
+  self_ctxt->trace->start();
+  self_ctxt->trace->set_name("FILE IO OPEN");
   int res = open(addr.file_path, O_RDWR | O_CREAT | O_TRUNC, 0644);
   if (res < 0) {
     co_return std::unexpected(
@@ -234,6 +238,9 @@ BlockingFileWriteIOTransport::io_open(IOAddress addr) {
 Task<std::expected<int, ErrorWrapper>>
 BlockingFileWriteIOTransport::io_read(IOAddress addr, uint8_t *buf,
                                       uint64_t buf_size) {
+  auto self_ctxt = co_await get_ctxt();
+  self_ctxt->trace->start();
+  self_ctxt->trace->set_name("FILE IO READ");
   int res = read(addr.fd, buf, buf_size);
   if (res < 0) {
     co_return std::unexpected(
@@ -244,6 +251,9 @@ BlockingFileWriteIOTransport::io_read(IOAddress addr, uint8_t *buf,
 Task<std::expected<int, ErrorWrapper>>
 BlockingFileWriteIOTransport::io_write(IOAddress addr, const uint8_t *buf,
                                        uint64_t buf_size) {
+  auto self_ctxt = co_await get_ctxt();
+  self_ctxt->trace->start();
+  self_ctxt->trace->set_name("FILE IO WRITE");
   int res = write(addr.fd, buf, buf_size);
   if (res < 0) {
     co_return std::unexpected(
@@ -253,6 +263,9 @@ BlockingFileWriteIOTransport::io_write(IOAddress addr, const uint8_t *buf,
 }
 Task<std::expected<int, ErrorWrapper>>
 BlockingFileWriteIOTransport::io_close(IOAddress addr) {
+  auto self_ctxt = co_await get_ctxt();
+  self_ctxt->trace->start();
+  self_ctxt->trace->set_name("FILE IO CLOSE");
   int res = close(addr.fd);
   if (res < 0) {
     co_return std::unexpected(

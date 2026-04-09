@@ -22,6 +22,7 @@ struct SkipAwaiter {
     trace->start();
     trace->add_time(wall_sleep_time);
     trace->set_name("Sleep");
+    trace->end();
     h.promise().ctxt.trace->append_child(trace);
     h.promise().ctxt.trace->add_time(wall_sleep_time);
     auto _ = program_ctxt->deadline_tracker->add_deadline(h, nullptr, timeout);

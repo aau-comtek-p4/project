@@ -9,10 +9,10 @@
 
 #include <cstdint>
 struct Trace {
-  uint64_t start_time_ns;
-  uint64_t last_suspend_ns;
-  uint64_t duration_ns;
-  uint64_t actual_duration_ns;
+  uint64_t start_time_ns = 0;
+  uint64_t last_suspend_ns = 0;
+  uint64_t duration_ns = 0;
+  uint64_t actual_duration_ns = 0;
   Trace *first_child = nullptr;
   Trace *last_child = nullptr;
   Trace *next_sibling = nullptr;
@@ -24,6 +24,7 @@ struct Trace {
   void append_child(Trace *trace);
   void set_name(const char *);
   void start();
+  void end();
   void suspend_trace();
   void resume_trace();
   void add_time(uint64_t time);

@@ -153,6 +153,12 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
     return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
                                         .error = CapacityError::OUTSIDE_RANGE});
   }
+  if (cur_bucket_ptr->allocation_size == 0) {
+    program_ctxt->logger->log_err(ALLOCATOR_ERROR_TAG,
+                                  "Attempt to free zero allocated memory");
+    return std::unexpected(ErrorWrapper{
+        .tag = ErrorWrapper::CUSTOM, .error = CapacityError::BUFFER_UNDERFLOW});
+  }
   uint64_t used_memory = cur_bucket_ptr->allocation_size;
   cur_bucket_ptr->next_ptr = this->free_bucket_header_ptr;
   this->free_bucket_header_ptr = cur_bucket_ptr;

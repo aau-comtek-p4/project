@@ -30,7 +30,6 @@ public:
   using handle_type = std::coroutine_handle<promise_type>;
   handle_type handle;
   explicit Task(handle_type h) : handle(h) {};
-  ~Task();
   bool await_ready();
 
   template <typename U>
@@ -62,20 +61,16 @@ Task<T>::await_suspend(std::coroutine_handle<U> caller) {
 template <typename T> T Task<T>::await_resume() {
   return std::move(this->handle.promise().result);
 }
-template <typename T> Task<T>::~Task() {
-  if (this->handle) {
-    this->handle.destroy();
-  }
-}
 template <typename T> Task<T>::Task(Task &&other) : handle(other.handle) {
   other.handle = nullptr; // prevent double destroy
 }
 
 template <typename T> Task<T> &Task<T>::operator=(Task &&other) {
   if (this != &other) {
-    if (handle)
-      handle.destroy();
-    handle = other.handle;
+    if (this->handle) {
+      this->handle.destroy();
+    }
+    this->handle = other.handle;
     other.handle = nullptr;
   }
   return *this;
@@ -115,8 +110,8 @@ struct Task<T>::promise_type : public shared_promise_type {
         own_ctxt->trace->print();
         program_ctxt->trace_handler->clear_trace(own_ctxt->trace);
       }
-      if (own_ctxt->self_cancellation) {
-        void *gen_alloc = own_ctxt->self_cancellation;
+      void *gen_alloc = own_ctxt->self_cancellation;
+      if (gen_alloc) {
         auto res = program_ctxt->loop->free(gen_alloc);
         program_ctxt->logger->log_debug(COROUTINE_TAG,
                                         "Task freeing generator");
@@ -153,7 +148,10 @@ struct Task<T>::promise_type : public shared_promise_type {
   }
 
   std::suspend_always initial_suspend() { return {}; }
-  FinalAwaiter final_suspend() noexcept { return {}; }
+  FinalAwaiter final_suspend() noexcept {
+    this->ctxt.trace->suspend_trace();
+    return {};
+  }
   void *operator new(size_t n) {
     auto res = program_ctxt->frame_allocator->allocate(n);
     if (!res.has_value()) {
@@ -174,6 +172,7 @@ struct Task<T>::promise_type : public shared_promise_type {
 
   void operator delete(void *ptr) {
 
+    program_ctxt->logger->log_debug(COROUTINE_TAG, "Task freeing itself");
     auto res = program_ctxt->frame_allocator->free(ptr);
     if (res.has_value()) {
       program_ctxt->metrics->document_metric(MetricType::COROUTINES_FREED);

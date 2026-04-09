@@ -116,6 +116,8 @@ struct Job::promise_type : public shared_promise_type {
 
   std::suspend_always initial_suspend() { return {}; }
   std::suspend_never final_suspend() noexcept {
+    this->ctxt.trace->print();
+    program_ctxt->trace_handler->clear_trace(this->ctxt.trace);
     if (this->ctxt.self_cancellation) {
       auto res = program_ctxt->loop->free(this->ctxt.self_cancellation);
       program_ctxt->logger->log_debug(COROUTINE_TAG, "Job freeing generator");
@@ -148,6 +150,7 @@ struct Job::promise_type : public shared_promise_type {
   }
 
   void operator delete(void *ptr) {
+    program_ctxt->logger->log_debug(COROUTINE_TAG, "Job freeing itself");
     auto res = program_ctxt->frame_allocator->free(ptr);
     if (res.has_value()) {
       program_ctxt->metrics->document_metric(MetricType::COROUTINES_FREED);
