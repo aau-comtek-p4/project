@@ -15,6 +15,7 @@
 #include <coroutine>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <expected>
 #include <system_error>
 template <typename T> std::expected<void, ErrorWrapper> spawn(T &&routine) {
@@ -88,8 +89,13 @@ public:
 
 struct Job::promise_type : public shared_promise_type {
   promise_type() {};
+  template <typename A> auto await_transform(A &&awaiter) {
+    return TraceAwaiter<A>{std::forward<A>(awaiter), &this->ctxt};
+  }
+
   auto get_return_object() {
     auto h = handle_type::from_promise(*this);
+    this->ctxt.trace = program_ctxt->trace_handler->get_trace();
     this->ctxt.handle = h;
     this->ctxt.id =
         program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE);

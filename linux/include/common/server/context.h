@@ -16,6 +16,7 @@ struct ServerContextSettings : public ContextSettings {
   static constexpr uint64_t max_deadlines = 20;
   static constexpr uint64_t max_queue_depth = 20;
   static constexpr uint64_t max_io_transport_size = 1024;
+  static constexpr uint64_t max_trace_amount = 150;
 };
 
 #endif

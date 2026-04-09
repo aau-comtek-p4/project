@@ -6,6 +6,7 @@
 #include "general/interfaces/event_loop/coroutines/task.h"
 #include "general/interfaces/event_loop/deadline_keeper.h"
 #include "general/interfaces/io/io.h"
+#include "general/interfaces/utility/clock.h"
 #include "general/interfaces/utility/logger.h"
 #include "general/misc/context.h"
 #include "general/misc/errors.h"
@@ -34,6 +35,10 @@ template <typename T> struct TimeoutAwaiter {
         timeout_routine(this->routine_handler.promise().ctxt.io_address);
     this->timeout_handle = timeouter.handle;
     this->timeout_handle.promise().ctxt.parent_ctxt = &h.promise().ctxt;
+    /*
+this->timeout_handle.promise().ctxt.trace->add_time(
+    this->timeout_tick * program_ctxt->clock->ms_pr_tick() * NS_PR_MS);
+            */
     spawn_future(std::move(timeouter), this->timeout_tick);
   }
 

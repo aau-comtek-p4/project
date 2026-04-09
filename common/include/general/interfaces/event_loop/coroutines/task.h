@@ -20,6 +20,7 @@
 #include <exception>
 #include <expected>
 #include <system_error>
+#include <type_traits>
 #include <utility>
 
 template <typename T> class Task {
@@ -86,6 +87,9 @@ struct Task<T>::promise_type : public shared_promise_type {
   T result;
 
   promise_type() {};
+  template <typename A> auto await_transform(A &&awaiter) {
+    return TraceAwaiter<A>{std::forward<A>(awaiter), &this->ctxt};
+  }
   struct FinalAwaiter {
     bool await_ready() noexcept { return false; }
     void await_suspend(
@@ -93,6 +97,10 @@ struct Task<T>::promise_type : public shared_promise_type {
       CoRoutineCtxt *own_ctxt = &own_handler.promise().ctxt;
       CoRoutineCtxt *parent_ctxt = own_ctxt->parent_ctxt;
       if (parent_ctxt && !own_ctxt->cancelled) {
+        parent_ctxt->trace->append_child(own_ctxt->trace);
+        parent_ctxt->trace->add_time(own_ctxt->trace->duration_ns);
+        parent_ctxt->trace->add_actual_time(
+            own_ctxt->trace->actual_duration_ns);
         auto res = program_ctxt->loop->enque_staging(parent_ctxt->handle);
         if (!res.has_value()) {
           program_ctxt->logger->log_err(
@@ -102,6 +110,10 @@ struct Task<T>::promise_type : public shared_promise_type {
               own_handler.promise().ctxt.id, custom_strerror(res.error()));
           safe_shutdown(res.error());
         }
+      }
+      if (own_ctxt->cancelled) {
+        own_ctxt->trace->print();
+        program_ctxt->trace_handler->clear_trace(own_ctxt->trace);
       }
       if (own_ctxt->self_cancellation) {
         void *gen_alloc = own_ctxt->self_cancellation;
@@ -122,6 +134,7 @@ struct Task<T>::promise_type : public shared_promise_type {
   };
   auto get_return_object() {
     auto h = handle_type::from_promise(*this);
+    this->ctxt.trace = program_ctxt->trace_handler->get_trace();
     this->ctxt.handle = h;
     this->ctxt.id =
         program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE);

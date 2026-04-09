@@ -3,6 +3,7 @@
 #include "general/common.h"
 #include "general/interfaces/simulator/random.h"
 #include "general/interfaces/simulator/random/seeded_random.h"
+#include "general/interfaces/utility/trace.h"
 #include <cstdint>
 #define CONTEXT_TAG "CONTEXT"
 #define CONTEXT_ERROR_TAG "CONTEXT ERROR"
@@ -40,6 +41,7 @@ struct ContextSettings {
   static constexpr uint64_t max_staging_queue = 0;
   static constexpr uint64_t max_total_size = 0;
   static constexpr uint64_t max_io_transport_size = 0;
+  static constexpr uint64_t max_trace_amount = 0;
 };
 template <typename Setting> struct ContextConfig {
   ContextType ctx_type;
@@ -61,6 +63,7 @@ struct ProgramContext {
   IOHandler *io = nullptr;
   MetricsInterface *metrics = nullptr;
   RandomInterface *random = nullptr;
+  TraceHandler *trace_handler = nullptr;
 };
 
 #endif

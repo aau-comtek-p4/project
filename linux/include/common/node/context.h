@@ -2,7 +2,7 @@
 
 struct NodeContextSettings : public ContextSettings {
   static constexpr uint64_t clock_tick_ms = 10;
-  static constexpr uint64_t max_total_size = 1024 * 40;
+  static constexpr uint64_t max_total_size = 1024 * 60;
   static constexpr uint64_t max_coroutine_size = 350;
   static constexpr uint64_t max_coroutine_amount = 20;
   static constexpr uint64_t max_coroutine_generator_size = 30;
@@ -14,4 +14,5 @@ struct NodeContextSettings : public ContextSettings {
   static constexpr uint64_t max_deadlines = 20;
   static constexpr uint64_t max_queue_depth = 20;
   static constexpr uint64_t max_io_transport_size = 1024;
+  static constexpr uint64_t max_trace_amount = 150;
 };

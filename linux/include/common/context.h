@@ -26,7 +26,6 @@
 #include <coroutine>
 #include <cstdint>
 #include <cstdio>
-#include <ctime>
 
 template <typename Config>
 void innit_event_loop(ProgramContext *ctxt, Config ctx_config,
@@ -72,6 +71,7 @@ void innit_event_loop(ProgramContext *ctxt, Config ctx_config,
 template <typename Config>
 void innit_clock(ProgramContext *ctxt, Config ctx_config,
                  AllocatorInterface *allocator) {
+
   switch (ctx_config.clock_type) {
   case CtxtClockType::SIM_CLOCK: {
     fprintf(stderr, "Sim clock not implemented yet");
@@ -83,6 +83,7 @@ void innit_clock(ProgramContext *ctxt, Config ctx_config,
         (WallClock *)allocator->allocate(sizeof(WallClock)).value();
     new (wall_clock_ptr) WallClock(
         CLOCK_MONOTONIC, ctx_config.settings.clock_tick_ms * NS_PR_MS);
+
     ctxt->clock = wall_clock_ptr;
     return;
   }
@@ -225,12 +226,35 @@ void innit_random(ProgramContext *ctxt, Config ctx_config,
 }
 
 template <typename Config>
+void innit_trace(ProgramContext *ctxt, Config ctx_config,
+                 AllocatorInterface *allocator) {
+  using bucket_type = Bucket<sizeof(Trace)>;
+  using allocator_type =
+      BucketAllocator<ctx_config.settings.max_trace_amount, sizeof(Trace)>;
+  bucket_type *trace_buffer =
+      (bucket_type *)allocator
+          ->allocate(sizeof(bucket_type) * ctx_config.settings.max_trace_amount)
+          .value();
+
+  allocator_type *allocator_ptr =
+      (allocator_type *)allocator->allocate(sizeof(allocator_type)).value();
+  new (allocator_ptr) allocator_type(trace_buffer);
+
+  TraceHandler *trace_handler =
+      (TraceHandler *)allocator->allocate(sizeof(TraceHandler)).value();
+  new (trace_handler)
+      TraceHandler(allocator_ptr, ctx_config.settings.max_trace_amount);
+  program_ctxt->trace_handler = trace_handler;
+}
+
+template <typename Config>
 void innit_ctx(ProgramContext *ctxt, Config ctx_config,
                AllocatorInterface *allocator, const char *tag) {
   program_ctxt = ctxt;
   DummyLogger dummy_logger;
   ctxt->logger = &dummy_logger;
   uint64_t before = 0;
+
   innit_clock(ctxt, ctx_config, allocator);
   uint64_t actual_clock_size = allocator->amount_allocated - before;
   before += actual_clock_size;
@@ -258,6 +282,9 @@ void innit_ctx(ProgramContext *ctxt, Config ctx_config,
   innit_random(ctxt, ctx_config, allocator);
   uint64_t actual_random_size = allocator->amount_allocated - before;
   before += actual_random_size;
+  innit_trace(ctxt, ctx_config, allocator);
+  uint64_t actual_trace_size = allocator->amount_allocated - before;
+  before += actual_trace_size;
   program_ctxt->logger->log_debug(tag, "Allocated clock, size: [%" PRIu64 "]",
                                   actual_clock_size);
   program_ctxt->logger->log_debug(tag, "Allocated logger, size: [%" PRIu64 "]",
@@ -279,6 +306,8 @@ void innit_ctx(ProgramContext *ctxt, Config ctx_config,
                                   actual_metric_size);
   program_ctxt->logger->log_debug(tag, "Allocated random, size: [%" PRIu64 "]",
                                   actual_random_size);
+  program_ctxt->logger->log_debug(tag, "Allocated trace, size: [%" PRIu64 "]",
+                                  actual_trace_size);
 
   program_ctxt->logger->log_debug(tag, "Total allocations: [%" PRIu64 "]",
                                   allocator->amount_allocated);

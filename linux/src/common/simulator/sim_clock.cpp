@@ -27,12 +27,14 @@ uint64_t SimClock::tick() {
   this->tick_count += 1;
   return missed_ticks;
 };
-uint64_t SimClock::rt_now() { return this->tick_count; };
+uint64_t SimClock::rt_now_ns() { return this->tick_count; };
+uint64_t SimClock::rt_now_ms() { return this->tick_count; };
 uint64_t SimClock::rt_since_start_ms() { return this->tick_count; };
+uint64_t SimClock::rt_since_start_ns() { return this->tick_count; };
 uint64_t SimClock::tick_now() { return this->tick_count; };
 uint64_t SimClock::time_until_tick() { return 0; }
 
-uint64_t SimClock::ms_pr_tick() { return 1; }
+uint64_t SimClock::ms_pr_tick() { return this->tick_ns; }
 uint64_t SimClock::ms_to_tick(uint64_t time_ms) {
   return time_ms / this->ms_pr_tick();
 }
