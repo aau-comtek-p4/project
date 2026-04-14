@@ -18,7 +18,7 @@ struct CoRoutineCtxt {
   std::coroutine_handle<> handle;
   uint64_t id;
   uint64_t name_id;
-  Trace *trace;
+  Trace trace;
   void set_name(uint64_t name_id);
 };
 
@@ -51,11 +51,11 @@ template <typename Inner> struct TraceAwaiter {
   bool await_ready() { return inner.await_ready(); }
   template <typename Promise>
   auto await_suspend(std::coroutine_handle<Promise> h) {
-    this->ctxt->trace->suspend_trace();
+    this->ctxt->trace.suspend_trace();
     return inner.await_suspend(h);
   }
   auto await_resume() {
-    this->ctxt->trace->resume_trace();
+    this->ctxt->trace.resume_trace();
     return inner.await_resume();
   }
 };

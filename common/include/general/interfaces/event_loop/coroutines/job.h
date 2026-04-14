@@ -69,11 +69,11 @@ struct Job::promise_type : public shared_promise_type {
 
   auto get_return_object() {
     auto h = handle_type::from_promise(*this);
-    this->ctxt.trace = program_ctxt->trace_handler->get_trace();
     this->ctxt.handle = h;
+    program_ctxt->metrics->document_metric(MetricType::COROUTINE_CREATED);
     this->ctxt.id =
         program_ctxt->metrics->get_metric(MetricType::COROUTINE_CREATED);
-    program_ctxt->metrics->document_metric(MetricType::COROUTINE_CREATED);
+    this->ctxt.trace.id = this->ctxt.id;
 
     return Job(h);
   }
@@ -88,14 +88,13 @@ struct Job::promise_type : public shared_promise_type {
 
   std::suspend_always initial_suspend() { return {}; }
   std::suspend_never final_suspend() noexcept {
-    this->ctxt.trace->suspend_trace();
-    this->ctxt.trace->print();
+    this->ctxt.trace.suspend_trace();
+    this->ctxt.trace.print();
     uint64_t parent_id =
         this->ctxt.parent_ctxt ? this->ctxt.parent_ctxt->name_id : 0;
     program_ctxt->logger->log_entry(logging::log_coroutine_finished(
-        this->ctxt.name_id, parent_id, this->ctxt.trace->actual_duration_ns,
-        this->ctxt.trace->id));
-    program_ctxt->trace_handler->clear_trace(this->ctxt.trace);
+        this->ctxt.name_id, parent_id, this->ctxt.trace.actual_duration_ns,
+        this->ctxt.trace.id));
     return {};
   }
   void *operator new(size_t n) {

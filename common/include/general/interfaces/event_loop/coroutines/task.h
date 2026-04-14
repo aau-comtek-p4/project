@@ -65,8 +65,8 @@ template <typename U>
 std::coroutine_handle<>
 Task<T>::await_suspend(std::coroutine_handle<U> caller) {
   this->handle.promise().ctxt.parent_ctxt = &caller.promise().ctxt;
-  this->handle.promise().ctxt.trace->parent_id =
-      this->handle.promise().ctxt.parent_ctxt->trace->id;
+  this->handle.promise().ctxt.trace.parent_id =
+      this->handle.promise().ctxt.parent_ctxt->trace.id;
   auto _ = program_ctxt->loop->enque_staging(this->handle);
   return std::noop_coroutine();
 }
@@ -110,16 +110,17 @@ struct Task<T>::promise_type : public shared_promise_type {
       CoRoutineCtxt *own_ctxt = &own_handler.promise().ctxt;
       CoRoutineCtxt *parent_ctxt = own_ctxt->parent_ctxt;
       if (parent_ctxt && !own_ctxt->cancelled) {
-        parent_ctxt->trace->add_time(own_ctxt->trace->duration_ns);
-        parent_ctxt->trace->add_actual_time(
-            own_ctxt->trace->actual_duration_ns);
+        parent_ctxt->trace.add_time(own_ctxt->trace.duration_ns);
+        parent_ctxt->trace.add_actual_time(own_ctxt->trace.actual_duration_ns);
         auto res = program_ctxt->loop->enque_staging(parent_ctxt->handle);
         if (!res.has_value()) {
           safe_shutdown(res.error());
         }
       }
-      own_ctxt->trace->print();
-      program_ctxt->trace_handler->clear_trace(own_ctxt->trace);
+      if (own_ctxt->cancelled) {
+        own_ctxt->trace.parent_id = 0;
+      }
+      own_ctxt->trace.print();
       if (own_ctxt->spawned) {
         own_handler.destroy();
       }
@@ -131,13 +132,12 @@ struct Task<T>::promise_type : public shared_promise_type {
     }
   };
   auto get_return_object() {
-
     auto h = handle_type::from_promise(*this);
-    this->ctxt.trace = program_ctxt->trace_handler->get_trace();
     this->ctxt.handle = h;
+    program_ctxt->metrics->document_metric(MetricType::COROUTINE_CREATED);
     this->ctxt.id =
         program_ctxt->metrics->get_metric(MetricType::COROUTINE_CREATED);
-    program_ctxt->metrics->document_metric(MetricType::COROUTINE_CREATED);
+    this->ctxt.trace.id = this->ctxt.id;
     return Task<T>(h);
   }
 
@@ -150,12 +150,12 @@ struct Task<T>::promise_type : public shared_promise_type {
 
   std::suspend_always initial_suspend() { return {}; }
   FinalAwaiter final_suspend() noexcept {
-    this->ctxt.trace->suspend_trace();
+    this->ctxt.trace.suspend_trace();
     uint64_t parent_id =
         this->ctxt.parent_ctxt ? this->ctxt.parent_ctxt->name_id : 0;
     program_ctxt->logger->log_entry(logging::log_coroutine_finished(
-        this->ctxt.name_id, parent_id, this->ctxt.trace->actual_duration_ns,
-        this->ctxt.trace->id));
+        this->ctxt.name_id, parent_id, this->ctxt.trace.actual_duration_ns,
+        this->ctxt.trace.id));
     return {};
   }
   void *operator new(size_t n) {

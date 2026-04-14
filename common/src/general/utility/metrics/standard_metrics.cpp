@@ -56,10 +56,6 @@ const char *get_metric_type(MetricType metric_type) {
     return "disconnect";
   case MetricType::REAL_TICK:
     return "real_tick";
-  case MetricType::TRACE_CREATED:
-    return "trace_created";
-  case MetricType::TRACE_FREED:
-    return "trace_freed";
   }
   return "UNKNOWN METRIC";
 }
@@ -138,13 +134,6 @@ void StandardMetrics::document_metric(MetricType metric_type) {
   case MetricType::REAL_TICK:
     this->metrics_holder.real_tick += 1;
     return;
-
-  case MetricType::TRACE_CREATED:
-    this->metrics_holder.trace_created += 1;
-    return;
-  case MetricType::TRACE_FREED:
-    this->metrics_holder.trace_freed += 1;
-    return;
   }
 }
 
@@ -196,10 +185,6 @@ uint64_t StandardMetrics::get_metric(MetricType metric_type) {
     return this->metrics_holder.disconnect;
   case MetricType::REAL_TICK:
     return this->metrics_holder.real_tick;
-  case MetricType::TRACE_CREATED:
-    return this->metrics_holder.trace_created;
-  case MetricType::TRACE_FREED:
-    return this->metrics_holder.trace_freed;
   }
   safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM, .error = 1});
   return 0;

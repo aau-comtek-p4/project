@@ -16,7 +16,11 @@
 #define NAME_TIMEOUT_ROUTINE 9
 #define NAME_SLEEP_ROUTINE 10
 #define NAME_CTRLC_ROUTINE 11
-#define NAME_END 12
+#define NAME_IO_FILE_WRITE 12
+#define NAME_IO_FILE_READ 13
+#define NAME_IO_FILE_OPEN 14
+#define NAME_IO_FILE_CLOSE 15
+#define NAME_END 16
 class NameLookupInterface {
 public:
   virtual void set_name(uint64_t name_index, const char *name) = 0;

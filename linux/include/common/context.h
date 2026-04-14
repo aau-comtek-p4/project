@@ -232,28 +232,6 @@ void innit_random(ProgramContext *ctxt, Config ctx_config,
 }
 
 template <typename Config>
-void innit_trace(ProgramContext *ctxt, Config ctx_config,
-                 AllocatorInterface *allocator) {
-  using bucket_type = Bucket<sizeof(Trace)>;
-  using allocator_type =
-      BucketAllocator<ctx_config.settings.max_trace_amount, sizeof(Trace)>;
-  using trace_type = TraceHandler<ctx_config.settings.max_trace_amount>;
-  bucket_type *trace_buffer =
-      (bucket_type *)allocator
-          ->allocate(sizeof(bucket_type) * ctx_config.settings.max_trace_amount)
-          .value();
-
-  allocator_type *allocator_ptr =
-      (allocator_type *)allocator->allocate(sizeof(allocator_type)).value();
-  new (allocator_ptr) allocator_type(NAME_TRACE_ALLOCATOR, trace_buffer);
-
-  auto *trace_handler =
-      (trace_type *)allocator->allocate(sizeof(trace_type)).value();
-  new (trace_handler) trace_type(allocator_ptr);
-  program_ctxt->trace_handler = trace_handler;
-}
-
-template <typename Config>
 void innit_names(ProgramContext *ctxt, Config ctx_config,
                  AllocatorInterface *allocator) {
   using name_lookup_type = NameLookup<20, 20>;
@@ -272,6 +250,11 @@ void innit_names(ProgramContext *ctxt, Config ctx_config,
   lookup_ptr->set_name(NAME_CTRLC_ROUTINE, "ctrlc_routine");
   lookup_ptr->set_name(NAME_LOGGING_QUEUE, "logging_queue");
   lookup_ptr->set_name(NAME_IO_ALLOCATOR, "io_allocator");
+  lookup_ptr->set_name(NAME_IO_FILE_CLOSE, "io_file_close");
+  lookup_ptr->set_name(NAME_IO_FILE_WRITE, "io_file_write");
+  lookup_ptr->set_name(NAME_IO_FILE_READ, "io_file_read");
+  lookup_ptr->set_name(NAME_IO_FILE_OPEN, "io_file_open");
+
   program_ctxt->name_lookup = lookup_ptr;
 }
 
@@ -310,9 +293,6 @@ void innit_ctx(ProgramContext *ctxt, Config ctx_config,
   innit_frame_allocator(ctxt, ctx_config, allocator);
   uint64_t actual_frame_alloc_size = allocator->amount_allocated - before;
   before += actual_frame_alloc_size;
-  innit_trace(ctxt, ctx_config, allocator);
-  uint64_t actual_trace_size = allocator->amount_allocated - before;
-  before += actual_trace_size;
   innit_io(ctxt, ctx_config, allocator);
   uint64_t actual_io_size = allocator->amount_allocated - before;
   before += actual_io_size;

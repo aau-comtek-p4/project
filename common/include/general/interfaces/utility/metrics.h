@@ -29,8 +29,6 @@ enum MetricType {
   CLOSED_FAILED,
   DISCONNECT,
   REAL_TICK,
-  TRACE_CREATED,
-  TRACE_FREED,
 };
 
 class MetricsInterface {

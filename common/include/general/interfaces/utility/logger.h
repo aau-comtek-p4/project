@@ -87,9 +87,6 @@ union LogPayload {
   struct {
     uint64_t name_index;
     uint64_t parent_name_index;
-    uint64_t actual;
-    uint64_t deadline;
-    uint64_t delta;
     uint64_t trace_index;
   } coroutine_timeout;
 
@@ -190,8 +187,7 @@ LogEntry log_coroutine_finished(uint64_t name_index, uint64_t parent_name_index,
                                 uint64_t actual_time_elapsed_ns,
                                 uint64_t trace_index);
 LogEntry log_coroutine_timeout(uint64_t name_index, uint64_t parent_name_index,
-                               uint64_t trace_index, uint64_t deadline,
-                               uint64_t actual);
+                               uint64_t trace_index);
 
 LogEntry log_coroutine_suspended(uint64_t name_index,
                                  uint64_t actual_time_elapsed);

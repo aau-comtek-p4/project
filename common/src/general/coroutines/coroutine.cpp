@@ -9,5 +9,5 @@ void CoRoutineCtxt::set_name(uint64_t name_id) {
   program_ctxt->logger->log_entry(
       logging::log_coroutine_start(name_id, parent_id));
   this->name_id = name_id;
-  this->trace->set_name(this->name_id);
+  this->trace.set_name(this->name_id);
 }

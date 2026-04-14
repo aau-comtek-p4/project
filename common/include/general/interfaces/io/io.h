@@ -17,6 +17,8 @@
 
 class IOAwaitInterface {
 public:
+  IOType type;
+  IOMethod io_method;
   std::coroutine_handle<> handle;
   virtual void set_result(int result) = 0;
   virtual const char *get_type() = 0;
@@ -44,7 +46,7 @@ struct IOAddress;
 class IOHandler {
 private:
   AllocatorInterface *transport_allocator;
-  IOTransportWrapper transports[IO_END];
+  IOTransportWrapper transports[IOMethod::IO_END];
 
 public:
   IOHandler(AllocatorInterface *transport_allocator);
@@ -52,7 +54,7 @@ public:
   template <typename T> T *get_transport(IOMethod io_method);
   void submit_all();
   void process_all(uint64_t timeout);
-  void cancel(const void *user_data);
+  void cancel(IOMethod io_method, const void *user_data);
 };
 
 template <typename T> T *IOHandler::get_transport(IOMethod io_method) {

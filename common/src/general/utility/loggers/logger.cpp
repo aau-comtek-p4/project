@@ -120,8 +120,7 @@ LogEntry logging::log_coroutine_finished(uint64_t name_index,
 }
 LogEntry logging::log_coroutine_timeout(uint64_t name_index,
                                         uint64_t parent_name_index,
-                                        uint64_t trace_index, uint64_t deadline,
-                                        uint64_t actual) {
+                                        uint64_t trace_index) {
   LogEntry entry;
   entry.timestamp = program_ctxt->clock->rt_since_start_ns();
   entry.tick_count = program_ctxt->clock->tick_now();
@@ -131,9 +130,6 @@ LogEntry logging::log_coroutine_timeout(uint64_t name_index,
   entry.payload.coroutine_timeout.name_index = name_index;
   entry.payload.coroutine_timeout.parent_name_index = parent_name_index;
   entry.payload.coroutine_timeout.trace_index = trace_index;
-  entry.payload.coroutine_timeout.deadline = deadline;
-  entry.payload.coroutine_timeout.actual = actual;
-  entry.payload.coroutine_timeout.delta = actual - deadline;
   return entry;
 }
 LogEntry logging::log_coroutine_suspended(uint64_t name_index,
@@ -537,16 +533,12 @@ uint64_t JsonLogSerializer::serialize(char *buf, uint64_t max_entry,
   case LogReason::REASON_COROUTINE_TIMEOUT:
     return snprintf(buf + header_size, max_entry - header_size,
                     "\"name\":\"%s\",\"parent\":\"%s\","
-                    "\"trace_index\":%" PRIu64 ",\"deadline\":%" PRIu64
-                    ",\"actual\":%" PRIu64 ",\"delta\":%" PRIu64 "}}\n",
+                    "\"trace_index\":%" PRIu64 "}}\n",
                     program_ctxt->name_lookup->get_name(
                         log_entry.payload.coroutine_timeout.name_index),
                     program_ctxt->name_lookup->get_name(
                         log_entry.payload.coroutine_timeout.parent_name_index),
-                    log_entry.payload.coroutine_timeout.trace_index,
-                    log_entry.payload.coroutine_timeout.deadline,
-                    log_entry.payload.coroutine_timeout.actual,
-                    log_entry.payload.coroutine_timeout.delta) +
+                    log_entry.payload.coroutine_timeout.trace_index) +
            header_size;
   case LogReason::REASON_COROUTINE_FINISHED:
     return snprintf(buf + header_size, max_entry - header_size,

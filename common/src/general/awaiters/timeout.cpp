@@ -1,16 +1,20 @@
 #include "general/awaiters/timeout_awaiter.h"
 #include "general/common.h"
 #include "general/interfaces/utility/logger.h"
+#include "general/misc/names.h"
 
-Task<int> timeout_routine(const void *cancel_data) {
+Task<int> timeout_routine() {
   auto self_ctxt = co_await get_ctxt();
-  self_ctxt->set_name(9);
-  self_ctxt->trace->start();
+  self_ctxt->set_name(NAME_TIMEOUT_ROUTINE);
+  self_ctxt->trace.start();
 
-  if (!self_ctxt->cancelled) {
-    self_ctxt->trace->suspend_trace();
+  if (self_ctxt->cancelled) {
     co_return 0;
   }
-  self_ctxt->trace->suspend_trace();
+  if (self_ctxt->io_address) {
+    program_ctxt->io->cancel(self_ctxt->io_address->io_method,
+                             self_ctxt->io_address);
+  }
+
   co_return 0;
 }

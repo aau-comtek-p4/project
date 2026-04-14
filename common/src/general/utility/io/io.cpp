@@ -40,10 +40,6 @@ void IOHandler::process_all(uint64_t timeout) {
   }
 }
 
-void IOHandler::cancel(const void *user_data) {
-  for (uint64_t i = 0; i < IOMethod::IO_END; i++) {
-    if (this->transports[i].transport_ptr.has_value()) {
-      this->transports[i].transport_ptr.value()->cancel(user_data);
-    }
-  }
+void IOHandler::cancel(IOMethod io_method, const void *user_data) {
+  this->transports[io_method].transport_ptr.value()->cancel(user_data);
 };

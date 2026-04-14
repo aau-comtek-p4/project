@@ -55,8 +55,6 @@ def print_trace(trace:Trace,generation):
 with open("log.txt") as f:
     for l in f:
         y = json.loads(l)
-        if(y["serverity"] != "info" and y["serverity"] != "debug" ):
-            print("serverity found")
 
         if(y["reason"] == "trace_print"):
             parent_id= y["payload"]["parent_id"]
@@ -68,6 +66,7 @@ with open("log.txt") as f:
                 new_trace = Trace(trace_id,name,parent_id,duration,actual)
                 build_trace(new_trace)
                 print_trace(new_trace,0)
+                print()
         if(y["reason"] == "tick_complete"):
             reamining = y["payload"]["remaining"]
             if(reamining < min_remaining):

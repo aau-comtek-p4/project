@@ -68,7 +68,6 @@ struct ProgramContext {
   IOHandler *io = nullptr;
   MetricsInterface *metrics = nullptr;
   RandomInterface *random = nullptr;
-  TraceHandlerInterface *trace_handler = nullptr;
 };
 
 #endif
