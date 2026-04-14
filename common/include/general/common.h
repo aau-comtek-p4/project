@@ -10,6 +10,7 @@ class DeadlineStorageInterface;
 class IOHandler;
 class MetricsInterface;
 class RandomInterface;
+class TraceHandlerInterface;
 
 struct ProgramContext;
 

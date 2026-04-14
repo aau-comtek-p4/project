@@ -11,8 +11,6 @@
 #define EVENT_LOOP_ERR_TAG "EVENT LOOP ERR"
 class EventLoopInterface {
 public:
-  virtual std::expected<void *, ErrorWrapper> allocate(size_t n) = 0;
-  virtual std::expected<void, ErrorWrapper> free(void *ptr) = 0;
   virtual std::expected<void, ErrorWrapper>
   enque(std::coroutine_handle<> handle) = 0;
   virtual std::expected<void, ErrorWrapper>

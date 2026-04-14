@@ -1,13 +1,6 @@
 #include "general/interfaces/utility/loggers/dummy_logger.h"
 
-__attribute__((format(printf, 3, 4))) void
-DummyLogger::log_info(const char *tag, const char *fmt, ...) noexcept {};
+void DummyLogger::submit() noexcept {};
+void DummyLogger::submit(uint64_t timeout) noexcept {};
 
-__attribute__((format(printf, 3, 4))) void
-DummyLogger::log_debug(const char *tag, const char *fmt, ...) noexcept {};
-
-__attribute__((format(printf, 3, 4))) void
-DummyLogger::log_warning(const char *tag, const char *fmt, ...) noexcept {};
-
-__attribute__((format(printf, 3, 4))) void
-DummyLogger::log_err(const char *tag, const char *fmt, ...) noexcept {};
+void DummyLogger::log_entry(LogEntry entry) noexcept {};

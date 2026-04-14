@@ -15,7 +15,7 @@ enum MetricType {
   MESSAGE_SENT,
   MESSAGE_RECEIVED,
   CONNECTION_RECEIVED,
-  TOTAL_COROUTINE,
+  COROUTINE_CREATED,
   COROUTINES_FREED,
   ACCEPTED_CONNECTION,
   FAILED_ACCEPT,
@@ -29,9 +29,12 @@ enum MetricType {
   CLOSED_FAILED,
   DISCONNECT,
   REAL_TICK,
+  TRACE_CREATED,
+  TRACE_FREED,
 };
 
 class MetricsInterface {
+
 public:
   virtual void document_metric(MetricType metric_type) = 0;
   virtual uint64_t get_metric(MetricType metric_type) = 0;

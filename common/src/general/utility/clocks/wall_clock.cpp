@@ -42,23 +42,20 @@ uint64_t WallClock::tick() {
     uint64_t missed_ns = start_time - this->future_time;
     missed_ticks = missed_ns / this->tick_ns;
     if (missed_ns > this->tick_ns * MISSED_TICK_WARNING_THRESHOLD) {
-      program_ctxt->logger->log_warning(
-          CLOCK_TAG,
-          "Missed tick threshold surpassed, missed ns: [%" PRIu64
-          "], threshold: [%" PRIu64 "]",
-          missed_ns, (uint64_t)(this->tick_ns * MISSED_TICK_WARNING_THRESHOLD));
+      program_ctxt->logger->log_entry(
+          logging::log_clock_miss(this->future_time, start_time));
       program_ctxt->metrics->document_metric(MetricType::TICK_MISS);
     }
+  }
+  if (start_time < this->future_time) {
+    program_ctxt->logger->log_entry(
+        logging::log_clock_tick(this->future_time, start_time));
   }
   while (start_time < this->future_time) {
     start_time = this->rt_now_ns();
   }
   this->tick_count += 1;
   if (missed_ticks > MAX_MISSED_TICK) {
-    program_ctxt->logger->log_warning(
-        CLOCK_TAG,
-        "Max missed tick threshold reached, missed ticks: [%" PRIu64 "]",
-        missed_ticks);
     this->future_time = start_time + this->tick_ns;
   } else {
     this->future_time += (missed_ticks + 1) * this->tick_ns;

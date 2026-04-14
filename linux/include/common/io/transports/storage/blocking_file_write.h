@@ -7,8 +7,6 @@
 
 class BlockingFileWriteIOTransport : public StorageIOTransport {
 private:
-  io_uring ring;
-
 public:
   BlockingFileWriteIOTransport(uint64_t queue_depth);
   void cancel(const void *user_data) override;

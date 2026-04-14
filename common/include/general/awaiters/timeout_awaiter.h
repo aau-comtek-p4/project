@@ -35,19 +35,26 @@ template <typename T> struct TimeoutAwaiter {
         timeout_routine(this->routine_handler.promise().ctxt.io_address);
     this->timeout_handle = timeouter.handle;
     this->timeout_handle.promise().ctxt.parent_ctxt = &h.promise().ctxt;
-    /*
-this->timeout_handle.promise().ctxt.trace->add_time(
-    this->timeout_tick * program_ctxt->clock->ms_pr_tick() * NS_PR_MS);
-            */
+    this->timeout_handle.promise().ctxt.trace->add_time(
+        this->timeout_tick * program_ctxt->clock->ms_pr_tick() * NS_PR_MS);
     spawn_future(std::move(timeouter), this->timeout_tick);
   }
 
   std::expected<return_type, ErrorWrapper> await_resume() {
     if (this->routine_handler.done()) {
       this->timeout_handle.promise().ctxt.cancelled = true;
+      this->routine_handler.promise().ctxt.trace->parent_id =
+          this->routine_handler.promise().ctxt.parent_ctxt->trace->id;
       return_type res = this->routine_handler.promise().result;
       return res;
     }
+    program_ctxt->logger->log_entry(logging::log_coroutine_timeout(
+        this->routine_handler.promise().ctxt.name_id,
+        this->routine_handler.promise().ctxt.parent_ctxt->name_id,
+        this->routine_handler.promise().ctxt.trace->id, this->timeout_tick,
+        this->timeout_tick));
+    this->timeout_handle.promise().ctxt.trace->parent_id =
+        this->timeout_handle.promise().ctxt.parent_ctxt->trace->id;
     program_ctxt->metrics->document_metric(MetricType::SURPASSED_DEADLINE);
     this->routine_handler.promise().ctxt.cancelled = true;
     return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,

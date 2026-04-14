@@ -11,15 +11,11 @@ class BasicEventLoop : public EventLoopInterface {
 private:
   QueueInterface<std::coroutine_handle<>> *ready_queue;
   QueueInterface<std::coroutine_handle<>> *staging_queue;
-  AllocatorInterface *coroutine_generator_allocator;
   bool running;
 
 public:
   BasicEventLoop(QueueInterface<std::coroutine_handle<>> *ready_queue,
-                 QueueInterface<std::coroutine_handle<>> *staging_queue,
-                 AllocatorInterface *coroutine_generator_allocator);
-  std::expected<void *, ErrorWrapper> allocate(size_t n) override;
-  std::expected<void, ErrorWrapper> free(void *ptr) override;
+                 QueueInterface<std::coroutine_handle<>> *staging_queue);
   std::expected<void, ErrorWrapper>
   enque(std::coroutine_handle<> handle) override;
   std::expected<void, ErrorWrapper>
@@ -28,7 +24,8 @@ public:
   std::expected<void, ErrorWrapper> set_future(std::coroutine_handle<> handle,
                                                uint64_t future_tick) override;
 
-  std::expected<void, ErrorWrapper> run_step(uint64_t cqe_timeout);
+  std::expected<void, ErrorWrapper> run_step(uint64_t cqe_timeout,
+                                             uint64_t log_timeout);
   std::expected<void, ErrorWrapper> step() override;
   std::expected<void, ErrorWrapper> run() override;
   std::expected<void, ErrorWrapper> run(uint64_t timeout) override;

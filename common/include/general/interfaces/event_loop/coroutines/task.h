@@ -10,12 +10,14 @@
 #include "general/misc/context.h"
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
+#include <algorithm>
 #include <cassert>
 #include <cerrno>
 #include <cinttypes>
 #include <coroutine>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <exception>
 #include <expected>
@@ -31,6 +33,7 @@ public:
   handle_type handle;
   explicit Task(handle_type h) : handle(h) {};
   bool await_ready();
+  ~Task();
 
   template <typename U>
   std::coroutine_handle<> await_suspend(std::coroutine_handle<U> caller);
@@ -50,16 +53,29 @@ bool Task<T>::await_ready() {
   return this->handle.done();
 }
 
+template <typename T> Task<T>::~Task() {
+  if (this->handle && !this->handle.promise().ctxt.spawned) {
+    this->handle.destroy();
+    this->handle = nullptr;
+  }
+}
+
 template <typename T>
 template <typename U>
 std::coroutine_handle<>
 Task<T>::await_suspend(std::coroutine_handle<U> caller) {
   this->handle.promise().ctxt.parent_ctxt = &caller.promise().ctxt;
-  return this->handle;
+  this->handle.promise().ctxt.trace->parent_id =
+      this->handle.promise().ctxt.parent_ctxt->trace->id;
+  auto _ = program_ctxt->loop->enque_staging(this->handle);
+  return std::noop_coroutine();
 }
 
 template <typename T> T Task<T>::await_resume() {
-  return std::move(this->handle.promise().result);
+  T val = std::move(this->handle.promise().result);
+  this->handle.destroy();
+  this->handle = nullptr;
+  return val;
 }
 template <typename T> Task<T>::Task(Task &&other) : handle(other.handle) {
   other.handle = nullptr; // prevent double destroy
@@ -86,54 +102,42 @@ struct Task<T>::promise_type : public shared_promise_type {
     return TraceAwaiter<A>{std::forward<A>(awaiter), &this->ctxt};
   }
   struct FinalAwaiter {
+    std::coroutine_handle<Task<T>::promise_type> handle;
     bool await_ready() noexcept { return false; }
     void await_suspend(
         std::coroutine_handle<Task<T>::promise_type> own_handler) noexcept {
+      this->handle = own_handler;
       CoRoutineCtxt *own_ctxt = &own_handler.promise().ctxt;
       CoRoutineCtxt *parent_ctxt = own_ctxt->parent_ctxt;
       if (parent_ctxt && !own_ctxt->cancelled) {
-        parent_ctxt->trace->append_child(own_ctxt->trace);
         parent_ctxt->trace->add_time(own_ctxt->trace->duration_ns);
         parent_ctxt->trace->add_actual_time(
             own_ctxt->trace->actual_duration_ns);
         auto res = program_ctxt->loop->enque_staging(parent_ctxt->handle);
         if (!res.has_value()) {
-          program_ctxt->logger->log_err(
-              COROUTINE_ERR_TAG,
-              "Task id [%" PRIu64
-              "] failed to enque continuation, received error [%s]",
-              own_handler.promise().ctxt.id, custom_strerror(res.error()));
           safe_shutdown(res.error());
         }
       }
-      if (own_ctxt->cancelled) {
-        own_ctxt->trace->print();
-        program_ctxt->trace_handler->clear_trace(own_ctxt->trace);
+      own_ctxt->trace->print();
+      program_ctxt->trace_handler->clear_trace(own_ctxt->trace);
+      if (own_ctxt->spawned) {
+        own_handler.destroy();
       }
-      void *gen_alloc = own_ctxt->self_cancellation;
-      if (gen_alloc) {
-        auto res = program_ctxt->loop->free(gen_alloc);
-        program_ctxt->logger->log_debug(COROUTINE_TAG,
-                                        "Task freeing generator");
-        if (!res.has_value()) {
-          program_ctxt->logger->log_err(COROUTINE_ERR_TAG,
-                                        "Task failed to free generator");
-          safe_shutdown(res.error());
-        }
-      }
-      own_handler.destroy();
-
       return;
     }
-    void await_resume() noexcept {}
+    T await_resume() noexcept {
+      T val = std::move(this->handle.promise().result);
+      return val;
+    }
   };
   auto get_return_object() {
+
     auto h = handle_type::from_promise(*this);
     this->ctxt.trace = program_ctxt->trace_handler->get_trace();
     this->ctxt.handle = h;
     this->ctxt.id =
-        program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE);
-    program_ctxt->metrics->document_metric(MetricType::TOTAL_COROUTINE);
+        program_ctxt->metrics->get_metric(MetricType::COROUTINE_CREATED);
+    program_ctxt->metrics->document_metric(MetricType::COROUTINE_CREATED);
     return Task<T>(h);
   }
 
@@ -141,47 +145,35 @@ struct Task<T>::promise_type : public shared_promise_type {
 
   void unhandled_exception() {
     ErrorWrapper error{.tag = ErrorWrapper::ERRNO, .error = errno};
-    program_ctxt->logger->log_err(COROUTINE_ERR_TAG,
-                                  "Task received unexpected error: [%s]",
-                                  custom_strerror(error));
     safe_shutdown(error);
   }
 
   std::suspend_always initial_suspend() { return {}; }
   FinalAwaiter final_suspend() noexcept {
     this->ctxt.trace->suspend_trace();
+    uint64_t parent_id =
+        this->ctxt.parent_ctxt ? this->ctxt.parent_ctxt->name_id : 0;
+    program_ctxt->logger->log_entry(logging::log_coroutine_finished(
+        this->ctxt.name_id, parent_id, this->ctxt.trace->actual_duration_ns,
+        this->ctxt.trace->id));
     return {};
   }
   void *operator new(size_t n) {
     auto res = program_ctxt->frame_allocator->allocate(n);
     if (!res.has_value()) {
-      program_ctxt->logger->log_err(
-          COROUTINE_ERR_TAG,
-          "Failed to allocate space for new task, got error: [%s]",
-          custom_strerror(res.error()));
       safe_shutdown(res.error());
     }
-    program_ctxt->logger->log_debug(
-        COROUTINE_TAG,
-        "Created new task id [%" PRIu64 "], space required: [%" PRIu64
-        "] bytes",
-        program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE),
-        (uint64_t)n);
     return res.value();
   }
 
   void operator delete(void *ptr) {
 
-    program_ctxt->logger->log_debug(COROUTINE_TAG, "Task freeing itself");
     auto res = program_ctxt->frame_allocator->free(ptr);
     if (res.has_value()) {
       program_ctxt->metrics->document_metric(MetricType::COROUTINES_FREED);
       return;
     }
-    program_ctxt->logger->log_err(COROUTINE_ERR_TAG,
-                                  "Task failed to free itself via frame "
-                                  "allocator, got error: [%s]",
-                                  custom_strerror(res.error()));
+
     safe_shutdown(res.error());
   }
 };

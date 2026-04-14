@@ -3,7 +3,7 @@
 #include "general/common.h"
 #include "general/interfaces/simulator/random.h"
 #include "general/interfaces/simulator/random/seeded_random.h"
-#include "general/interfaces/utility/trace.h"
+#include "general/misc/names.h"
 #include <cstdint>
 #define CONTEXT_TAG "CONTEXT"
 #define CONTEXT_ERROR_TAG "CONTEXT ERROR"
@@ -16,6 +16,9 @@ enum CtxtLoggerType {
   FWRITE_LOGGER,
   DUMMY_LOGGER,
   ESP_LOGGER,
+};
+enum CtxtLoggerSerializer {
+  JSON_SERIALIZER,
 };
 enum CtxtDeadlineTrackerType {
   MIN_HEAP,
@@ -47,6 +50,7 @@ template <typename Setting> struct ContextConfig {
   ContextType ctx_type;
   CtxtClockType clock_type;
   CtxtLoggerType logger_type;
+  CtxtLoggerSerializer log_serializer_type;
   CtxtDeadlineTrackerType deadline_tracker_type;
   CtxtRandomType random_type;
   CtxtMetricType metric_type;
@@ -54,6 +58,7 @@ template <typename Setting> struct ContextConfig {
 };
 
 struct ProgramContext {
+  NameLookupInterface *name_lookup;
   LoggerInterface *logger = nullptr;
   ClockInterface *clock = nullptr;
   EventLoopInterface *loop = nullptr;
@@ -63,7 +68,7 @@ struct ProgramContext {
   IOHandler *io = nullptr;
   MetricsInterface *metrics = nullptr;
   RandomInterface *random = nullptr;
-  TraceHandler *trace_handler = nullptr;
+  TraceHandlerInterface *trace_handler = nullptr;
 };
 
 #endif

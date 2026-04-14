@@ -21,7 +21,6 @@ public:
 
   std::expected<void, ErrorWrapper>
   add_deadline(std::coroutine_handle<> handle,
-               shared_promise_type *promise_type,
                uint64_t remaining_tick) override;
   std::expected<void, ErrorWrapper> enforce_deadlines() override;
 };

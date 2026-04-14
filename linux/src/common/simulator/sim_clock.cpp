@@ -19,8 +19,6 @@ uint64_t SimClock::tick() {
   if (program_ctxt->random->inject_fault(RandomType::MISSED_TICK_CHANCE, 1)) {
     missed_ticks =
         program_ctxt->random->inject_value(RandomType::MISSED_TICK, 1);
-    program_ctxt->logger->log_warning(CLOCK_TAG, "Missed ticks: [%lu]",
-                                      missed_ticks);
     program_ctxt->metrics->document_metric(MetricType::TICK_MISS);
   }
   program_ctxt->metrics->document_metric(MetricType::REAL_TICK);

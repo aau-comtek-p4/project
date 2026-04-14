@@ -27,6 +27,8 @@ struct StandardMetricHolder {
   size_t closed_failed;
   size_t disconnect;
   size_t real_tick;
+  size_t trace_created;
+  size_t trace_freed;
 };
 class StandardMetrics : public MetricsInterface {
 private:

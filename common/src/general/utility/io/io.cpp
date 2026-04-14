@@ -1,31 +1,11 @@
 #include "general/interfaces/io/io.h"
 #include "general/common.h"
 #include "general/interfaces/storage/allocator.h"
+#include "general/interfaces/utility/logger.h"
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
 #include <cmath>
 #include <cstdint>
-const char *get_io_type(IOType type) {
-  switch (type) {
-  case IOType::OPEN:
-    return "OPEN";
-  case IOType::READ:
-    return "READ";
-  case IOType::WRITE:
-    return "WRITE";
-  case IOType::CLOSE:
-    return "CLOSE";
-  case IOType::RECV:
-    return "RECV";
-  case IOType::ACCEPT:
-    return "ACCEPT";
-  case IOType::SEND:
-    return "SEND";
-  case IOType::CONNECT:
-    return "CONNECT";
-  }
-  return "Unknown type";
-}
 
 IOHandler::IOHandler(AllocatorInterface *transport_allocator) {
   this->transport_allocator = transport_allocator;
@@ -35,9 +15,6 @@ IOTransport *IOHandler::register_transport(IOMethod io_method,
                                            uint64_t transport_size) {
   auto res = this->transport_allocator->allocate(transport_size);
   if (!res.has_value()) {
-    program_ctxt->logger->log_err(
-        IO_ERROR_TAG, "IO handler failed to register transport of type: [%s]",
-        "hello");
     safe_shutdown(res.error());
   }
 

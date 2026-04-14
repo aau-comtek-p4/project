@@ -14,14 +14,12 @@
 struct Deadline {
   std::coroutine_handle<> handle;
   uint64_t deadline_tick;
-  shared_promise_type *promise_type;
 };
 
 class DeadlineStorageInterface {
 public:
   virtual std::expected<void, ErrorWrapper>
-  add_deadline(std::coroutine_handle<> handle,
-               shared_promise_type *promise_type, uint64_t remaining_tick) = 0;
+  add_deadline(std::coroutine_handle<> handle, uint64_t remaining_tick) = 0;
   virtual std::expected<void, ErrorWrapper> enforce_deadlines() = 0;
 };
 

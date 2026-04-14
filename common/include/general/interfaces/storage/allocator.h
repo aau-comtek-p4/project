@@ -14,6 +14,8 @@
 class AllocatorInterface {
 public:
   uint64_t amount_allocated;
+  uint64_t total_memory;
+  uint64_t name_index;
   virtual std::expected<void *, ErrorWrapper> allocate(uint64_t n) = 0;
   virtual std::expected<void, ErrorWrapper> free(void *) = 0;
 };

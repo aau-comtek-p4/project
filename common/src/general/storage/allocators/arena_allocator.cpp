@@ -10,30 +10,29 @@
 #include <cstdint>
 #include <expected>
 
-ArenaAllocator::ArenaAllocator(uint8_t *buffer, uint64_t buffer_size)
-    : buffer(buffer), buffer_size(buffer_size) {
+ArenaAllocator::ArenaAllocator(uint64_t name_index, uint8_t *buffer,
+                               uint64_t buffer_size)
+    : buffer(buffer) {
+  this->name_index = name_index;
   this->amount_allocated = 0;
+  this->total_memory = buffer_size;
 }
 
 std::expected<void *, ErrorWrapper> ArenaAllocator::allocate(uint64_t n) {
-  if (this->amount_allocated + n >= this->buffer_size) {
-    program_ctxt->logger->log_err(
-        ALLOCATOR_ERROR_TAG,
-        "Attempt to allocate arena allocator more than size");
+  if (this->amount_allocated + n >= this->total_memory) {
     return std::unexpected(
         ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
                      .error = CapacityError::INSUFFICIENT_SPACE});
   }
   void *current_ptr = this->buffer + this->amount_allocated;
   this->amount_allocated += n;
-  program_ctxt->logger->log_debug(ALLOCATOR_TAG,
-                                  "Arena allocated: [%" PRIu64 "]", n);
+  program_ctxt->logger->log_entry(logging::log_allocator_allocation(
+      this->name_index, n, this->total_memory - this->amount_allocated));
   if (this->amount_allocated >
-      this->buffer_size * ALLOCATOR_WARNING_THRESHOLD) {
-    program_ctxt->logger->log_warning(
-        ALLOCATOR_TAG,
-        "Arena allocator usage exceeded warning threshold, threshold: [%f]",
-        ALLOCATOR_WARNING_THRESHOLD);
+      this->total_memory * ALLOCATOR_WARNING_THRESHOLD) {
+    program_ctxt->logger->log_entry(logging::log_allocator_threshold_reached(
+        this->name_index, this->amount_allocated,
+        this->total_memory - this->amount_allocated));
   }
 
   return current_ptr;

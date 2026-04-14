@@ -31,7 +31,7 @@ public:
   int result;
   IOType type;
   void set_result(int result) { this->result = result; }
-  const char *get_type() { return get_io_type(this->type); };
+  const char *get_type() { return parse_io_type(this->type); };
 
   virtual void submit(io_uring_sqe *sqe) = 0;
   bool await_ready() { return false; }
@@ -42,8 +42,6 @@ public:
       this->result = -ECANCELED;
       auto res = program_ctxt->loop->enque_staging(handle);
       if (!res.has_value()) {
-        program_ctxt->logger->log_err(IO_TAG,
-                                      "Cancelled IO failed to enque handle");
         safe_shutdown(res.error());
       }
       return;
@@ -215,9 +213,7 @@ public:
   }
 };
 BlockingFileWriteIOTransport::BlockingFileWriteIOTransport(
-    uint64_t queue_depth) {
-  io_uring_queue_init(queue_depth, &this->ring, 0);
-}
+    uint64_t queue_depth) {}
 
 void BlockingFileWriteIOTransport::submit() {}
 void BlockingFileWriteIOTransport::process(uint64_t timeout) {}
@@ -226,9 +222,11 @@ void BlockingFileWriteIOTransport::cancel(const void *user_data) {}
 Task<std::expected<int, ErrorWrapper>>
 BlockingFileWriteIOTransport::io_open(IOAddress addr) {
   auto self_ctxt = co_await get_ctxt();
+
+  self_ctxt->set_name(4);
   self_ctxt->trace->start();
-  self_ctxt->trace->set_name("FILE IO OPEN");
-  int res = open(addr.file_path, O_RDWR | O_CREAT | O_TRUNC, 0644);
+  int res = open(addr.file_path, O_RDWR | O_CREAT | O_APPEND, 0644);
+
   if (res < 0) {
     co_return std::unexpected(
         ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = errno});
@@ -239,8 +237,9 @@ Task<std::expected<int, ErrorWrapper>>
 BlockingFileWriteIOTransport::io_read(IOAddress addr, uint8_t *buf,
                                       uint64_t buf_size) {
   auto self_ctxt = co_await get_ctxt();
+
+  self_ctxt->set_name(7);
   self_ctxt->trace->start();
-  self_ctxt->trace->set_name("FILE IO READ");
   int res = read(addr.fd, buf, buf_size);
   if (res < 0) {
     co_return std::unexpected(
@@ -252,8 +251,10 @@ Task<std::expected<int, ErrorWrapper>>
 BlockingFileWriteIOTransport::io_write(IOAddress addr, const uint8_t *buf,
                                        uint64_t buf_size) {
   auto self_ctxt = co_await get_ctxt();
+
+  self_ctxt->set_name(3);
   self_ctxt->trace->start();
-  self_ctxt->trace->set_name("FILE IO WRITE");
+
   int res = write(addr.fd, buf, buf_size);
   if (res < 0) {
     co_return std::unexpected(
@@ -264,8 +265,8 @@ BlockingFileWriteIOTransport::io_write(IOAddress addr, const uint8_t *buf,
 Task<std::expected<int, ErrorWrapper>>
 BlockingFileWriteIOTransport::io_close(IOAddress addr) {
   auto self_ctxt = co_await get_ctxt();
+  self_ctxt->set_name(5);
   self_ctxt->trace->start();
-  self_ctxt->trace->set_name("FILE IO CLOSE");
   int res = close(addr.fd);
   if (res < 0) {
     co_return std::unexpected(

@@ -6,7 +6,6 @@
 #include <expected>
 class StorageIOTransport : public IOTransport {
 public:
-public:
   virtual Task<std::expected<int, ErrorWrapper>> io_open(IOAddress addr) = 0;
   virtual Task<std::expected<int, ErrorWrapper>>
   io_read(IOAddress addr, uint8_t *buf, uint64_t buf_size) = 0;

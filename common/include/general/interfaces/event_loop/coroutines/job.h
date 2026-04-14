@@ -19,28 +19,15 @@
 #include <expected>
 #include <system_error>
 template <typename T> std::expected<void, ErrorWrapper> spawn(T &&routine) {
+
   auto typed_handle = routine.handle;
 
-  auto res = program_ctxt->loop->allocate(sizeof(T));
-  if (!res.has_value()) {
-    program_ctxt->logger->log_err(
-        EVENT_LOOP_ERR_TAG,
-        "In spawn failed to allocate enough space for coroutine "
-        "generator, error: [%s]",
-        custom_strerror(res.error()));
-    return std::unexpected(res.error());
-  }
-  T *ptr = new (res.value()) T(std::move(routine));
-
-  typed_handle.promise().ctxt.self_cancellation = ptr;
+  typed_handle.promise().ctxt.spawned = true;
   std::coroutine_handle<> handle = typed_handle;
   auto enqueue_res = program_ctxt->loop->enque_staging(std::move(handle));
   if (enqueue_res.has_value()) {
     return {};
   }
-  program_ctxt->logger->log_err(
-      EVENT_LOOP_ERR_TAG, "Failed to spawn co routine, received error: [%s]",
-      custom_strerror(enqueue_res.error()));
   return std::unexpected(enqueue_res.error());
 }
 
@@ -48,29 +35,15 @@ template <typename T>
 std::expected<void, ErrorWrapper> spawn_future(T &&routine,
                                                uint64_t future_tick_offset) {
   auto typed_handle = routine.handle;
-
-  auto res = program_ctxt->loop->allocate(sizeof(T));
-  if (!res.has_value()) {
-    program_ctxt->logger->log_err(
-        EVENT_LOOP_ERR_TAG,
-        "In set future failed to allocate enough space for coroutine "
-        "generator, error: [%s]",
-        custom_strerror(res.error()));
-    return std::unexpected(res.error());
-  }
-
-  T *ptr = new (res.value()) T(std::move(routine));
-  typed_handle.promise().ctxt.self_cancellation = ptr;
+  typed_handle.promise().ctxt.spawned = true;
   std::coroutine_handle<> handle = typed_handle;
+
   auto set_future_res =
       program_ctxt->loop->set_future(std::move(handle), future_tick_offset);
+
   if (set_future_res.has_value()) {
     return {};
   }
-  program_ctxt->logger->log_err(
-      EVENT_LOOP_ERR_TAG,
-      "Failed to set future co routine, received error: [%s]",
-      custom_strerror(set_future_res.error()));
   return std::unexpected(set_future_res.error());
 }
 
@@ -89,6 +62,7 @@ public:
 
 struct Job::promise_type : public shared_promise_type {
   promise_type() {};
+
   template <typename A> auto await_transform(A &&awaiter) {
     return TraceAwaiter<A>{std::forward<A>(awaiter), &this->ctxt};
   }
@@ -98,8 +72,9 @@ struct Job::promise_type : public shared_promise_type {
     this->ctxt.trace = program_ctxt->trace_handler->get_trace();
     this->ctxt.handle = h;
     this->ctxt.id =
-        program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE);
-    program_ctxt->metrics->document_metric(MetricType::TOTAL_COROUTINE);
+        program_ctxt->metrics->get_metric(MetricType::COROUTINE_CREATED);
+    program_ctxt->metrics->document_metric(MetricType::COROUTINE_CREATED);
+
     return Job(h);
   }
 
@@ -108,59 +83,35 @@ struct Job::promise_type : public shared_promise_type {
   void unhandled_exception() {
     ErrorWrapper error =
         ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = errno};
-    program_ctxt->logger->log_err(COROUTINE_ERR_TAG,
-                                  "Job received unexpected error: [%s]",
-                                  custom_strerror(error));
     safe_shutdown(error);
   }
 
   std::suspend_always initial_suspend() { return {}; }
   std::suspend_never final_suspend() noexcept {
+    this->ctxt.trace->suspend_trace();
     this->ctxt.trace->print();
+    uint64_t parent_id =
+        this->ctxt.parent_ctxt ? this->ctxt.parent_ctxt->name_id : 0;
+    program_ctxt->logger->log_entry(logging::log_coroutine_finished(
+        this->ctxt.name_id, parent_id, this->ctxt.trace->actual_duration_ns,
+        this->ctxt.trace->id));
     program_ctxt->trace_handler->clear_trace(this->ctxt.trace);
-    if (this->ctxt.self_cancellation) {
-      auto res = program_ctxt->loop->free(this->ctxt.self_cancellation);
-      program_ctxt->logger->log_debug(COROUTINE_TAG, "Job freeing generator");
-      if (!res.has_value()) {
-
-        program_ctxt->logger->log_err(COROUTINE_ERR_TAG,
-                                      "Job failed to free generator");
-        safe_shutdown(res.error());
-      }
-    }
-
     return {};
   }
   void *operator new(size_t n) {
     auto res = program_ctxt->frame_allocator->allocate(n);
     if (!res.has_value()) {
-      program_ctxt->logger->log_err(
-          COROUTINE_ERR_TAG,
-          "Failed to allocate space for new task, got error: [%s]",
-          custom_strerror(res.error()));
       safe_shutdown(res.error());
     }
-    program_ctxt->logger->log_debug(
-        COROUTINE_TAG,
-        "Created job task id [%" PRIu64 "], space required: [%" PRIu64
-        "] bytes",
-        program_ctxt->metrics->get_metric(MetricType::TOTAL_COROUTINE),
-        (uint64_t)n);
     return res.value();
   }
 
   void operator delete(void *ptr) {
-    program_ctxt->logger->log_debug(COROUTINE_TAG, "Job freeing itself");
     auto res = program_ctxt->frame_allocator->free(ptr);
     if (res.has_value()) {
       program_ctxt->metrics->document_metric(MetricType::COROUTINES_FREED);
       return;
     }
-    program_ctxt->logger->log_err(COROUTINE_ERR_TAG,
-                                  "Job failed to free itself via frame "
-                                  "allocator, got error: [%s]",
-                                  custom_strerror(res.error()));
-
     safe_shutdown(res.error());
   }
 };

@@ -2,7 +2,7 @@
 #define IO_INTERFACE_H
 #include "general/interfaces/event_loop/coroutines/task.h"
 #include "general/interfaces/storage/allocator.h"
-#include "general/interfaces/storage/allocators/bucket_allocator.h"
+#include "general/interfaces/utility/logger.h"
 #include "general/misc/errors.h"
 #include "netinet/in.h"
 #include <coroutine>
@@ -28,26 +28,6 @@ public:
   virtual int await_resume() = 0;
 };
 
-enum IOType {
-  READ,
-  WRITE,
-  OPEN,
-  CLOSE,
-  ACCEPT,
-  RECV,
-  SEND,
-  CONNECT,
-};
-enum IOMethod {
-  IO_WIFI_TCP = 0,
-  IO_WIFI_UDP = 1,
-  IO_ESP_NOW = 2,
-  IO_SERIAL = 3,
-  IO_GPIO = 4,
-  IO_FILE = 5,
-  IO_END = 6,
-};
-
 class IOTransport {
 public:
   virtual void cancel(const void *user_data) = 0;
@@ -58,6 +38,7 @@ public:
 struct IOTransportWrapper {
   std::optional<IOTransport *> transport_ptr;
 };
+template <typename T> class Task;
 
 struct IOAddress;
 class IOHandler {
@@ -79,5 +60,4 @@ template <typename T> T *IOHandler::get_transport(IOMethod io_method) {
   return transport_ptr;
 }
 
-const char *get_io_type(IOType type);
 #endif

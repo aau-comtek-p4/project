@@ -1,8 +1,10 @@
 #ifndef CO_ROUTINE_INTERFACE_H
 #define CO_ROUTINE_INTERFACE_H
+#include "general/common.h"
 #include "general/interfaces/utility/trace.h"
 #include <coroutine>
 #include <cstdint>
+#include <cstdio>
 
 #define COROUTINE_TAG "COROUTINE"
 #define COROUTINE_ERR_TAG "COROUTINE ERROR"
@@ -10,12 +12,14 @@ class IOAwaitInterface;
 
 struct CoRoutineCtxt {
   bool cancelled = false;
+  bool spawned = false;
   CoRoutineCtxt *parent_ctxt = nullptr;
-  void *self_cancellation = nullptr;
   IOAwaitInterface *io_address = nullptr;
   std::coroutine_handle<> handle;
   uint64_t id;
+  uint64_t name_id;
   Trace *trace;
+  void set_name(uint64_t name_id);
 };
 
 struct shared_promise_type {

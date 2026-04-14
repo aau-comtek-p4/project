@@ -11,58 +11,60 @@
 const char *get_metric_type(MetricType metric_type) {
   switch (metric_type) {
   case MetricType::CONNECTION_RECEIVED:
-    return "CONNECTION RECEIVED";
+    return "connection_received";
   case MetricType::MESSAGE_RECEIVED:
-    return "MESSAGE RECEIVED";
+    return "message_received";
   case MetricType::MESSAGE_SENT:
-    return "MESSAGE SENT";
+    return "message_sent";
   case MetricType::COROUTINES_FREED:
-    return "COROUTINES FREED";
+    return "coroutines_freed";
   case MetricType::PACKET_LOSS:
-    return "PACKET LOSS";
+    return "packet_loss";
   case MetricType::TICK_MISS:
-    return "TICK MISS";
+    return "tick_miss";
   case MetricType::SURPASSED_DEADLINE:
-    return "SURPASSED DEADLINE";
+    return "surpassed_deadline";
   case MetricType::FAILED_RECEIVE:
-    return "FAILED RECEIVE";
+    return "failed_receive";
   case MetricType::FAILED_CONNECT:
-    return "FAILED CONNECT";
+    return "failed_connect";
   case MetricType::FAILED_SEND:
-    return "FAILED SEND";
-  case MetricType::TOTAL_COROUTINE:
-    return "TOTAL COROUTINE";
+    return "failed_send";
+  case MetricType::COROUTINE_CREATED:
+    return "coroutine_created";
   case MetricType::ACCEPTED_CONNECTION:
-    return "ACCEPTED CONNECTION";
+    return "accepted_connection";
   case MetricType::FAILED_ACCEPT:
-    return "FAILED ACCEPT";
+    return "failed_accept";
   case MetricType::WRITE_FAILED:
-    return "WRITE FAILED";
+    return "write_failed";
   case MetricType::FILE_WRITE:
-    return "FILE WRITE";
+    return "file_write";
   case MetricType::READ_FAILED:
-    return "READ FAILED";
+    return "read_failed";
   case MetricType::FILE_READ:
-    return "FILE READ";
+    return "file-read";
   case MetricType::OPENED_FILE:
-    return "OPENED FILE";
+    return "opened_file";
   case MetricType::FAILED_OPENED:
-    return "FAILED OPENED";
+    return "failed_open";
   case MetricType::CLOSED_FD:
-    return "CLOSED FD";
+    return "closed_fd";
   case MetricType::CLOSED_FAILED:
-    return "CLOSED FAILED";
+    return "close_failed";
   case MetricType::DISCONNECT:
-    return "DISCONNECT";
+    return "disconnect";
   case MetricType::REAL_TICK:
-    return "REAL TICK";
+    return "real_tick";
+  case MetricType::TRACE_CREATED:
+    return "trace_created";
+  case MetricType::TRACE_FREED:
+    return "trace_freed";
   }
   return "UNKNOWN METRIC";
 }
 
 void StandardMetrics::document_metric(MetricType metric_type) {
-  program_ctxt->logger->log_debug(METRIC_TAG, "Metric [%s] documented",
-                                  get_metric_type(metric_type));
   switch (metric_type) {
   case MetricType::CONNECTION_RECEIVED:
     this->metrics_holder.connection_received += 1;
@@ -94,7 +96,7 @@ void StandardMetrics::document_metric(MetricType metric_type) {
   case MetricType::FAILED_SEND:
     this->metrics_holder.failed_send += 1;
     return;
-  case MetricType::TOTAL_COROUTINE:
+  case MetricType::COROUTINE_CREATED:
     this->metrics_holder.total_coroutines += 1;
     return;
   case MetricType::ACCEPTED_CONNECTION:
@@ -136,6 +138,13 @@ void StandardMetrics::document_metric(MetricType metric_type) {
   case MetricType::REAL_TICK:
     this->metrics_holder.real_tick += 1;
     return;
+
+  case MetricType::TRACE_CREATED:
+    this->metrics_holder.trace_created += 1;
+    return;
+  case MetricType::TRACE_FREED:
+    this->metrics_holder.trace_freed += 1;
+    return;
   }
 }
 
@@ -161,7 +170,7 @@ uint64_t StandardMetrics::get_metric(MetricType metric_type) {
     return this->metrics_holder.failed_connect;
   case MetricType::FAILED_SEND:
     return this->metrics_holder.failed_send;
-  case MetricType::TOTAL_COROUTINE:
+  case MetricType::COROUTINE_CREATED:
     return this->metrics_holder.total_coroutines;
   case MetricType::ACCEPTED_CONNECTION:
     return this->metrics_holder.accepted_connection;
@@ -185,20 +194,23 @@ uint64_t StandardMetrics::get_metric(MetricType metric_type) {
     return this->metrics_holder.closed_failed;
   case MetricType::DISCONNECT:
     return this->metrics_holder.disconnect;
-
   case MetricType::REAL_TICK:
     return this->metrics_holder.real_tick;
+  case MetricType::TRACE_CREATED:
+    return this->metrics_holder.trace_created;
+  case MetricType::TRACE_FREED:
+    return this->metrics_holder.trace_freed;
   }
-  program_ctxt->logger->log_err(METRIC_ERROR_TAG, "Got unkown metric: [%u]",
-                                metric_type);
   safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM, .error = 1});
   return 0;
 }
 
 void StandardMetrics::print_metric(MetricType metric_type) {
-  program_ctxt->logger->log_info(METRIC_TAG, "[%s]: [%" PRIu64 "]",
-                                 get_metric_type(metric_type),
-                                 this->get_metric(metric_type));
+  /*
+program_ctxt->logger->log_info(METRIC_TAG, "[%s]: [%" PRIu64 "]",
+                           get_metric_type(metric_type),
+                           this->get_metric(metric_type));
+                                                           */
 }
 
 void StandardMetrics::print_metrics() {
@@ -212,7 +224,7 @@ void StandardMetrics::print_metrics() {
   this->print_metric(MetricType::FAILED_RECEIVE);
   this->print_metric(MetricType::FAILED_CONNECT);
   this->print_metric(MetricType::FAILED_SEND);
-  this->print_metric(MetricType::TOTAL_COROUTINE);
+  this->print_metric(MetricType::COROUTINE_CREATED);
   this->print_metric(MetricType::ACCEPTED_CONNECTION);
   this->print_metric(MetricType::FAILED_ACCEPT);
   this->print_metric(MetricType::OPENED_FILE);
