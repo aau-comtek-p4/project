@@ -11,6 +11,7 @@
 #include <cstddef>
 #define TRACE_TAG "TRACE"
 #define TRACE_ERROR_TAG "TRACE ERROR"
+#define TRACE_LOGGING 1
 
 #include <cstdint>
 class Trace {
@@ -28,6 +29,7 @@ public:
   void start();
   void end();
   void suspend_trace();
+  void suspend_trace(bool print);
   void resume_trace();
   void add_time(uint64_t time);
   void add_actual_time(uint64_t time);

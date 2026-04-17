@@ -26,8 +26,11 @@ std::expected<void *, ErrorWrapper> ArenaAllocator::allocate(uint64_t n) {
   }
   void *current_ptr = this->buffer + this->amount_allocated;
   this->amount_allocated += n;
-  program_ctxt->logger->log_entry(logging::log_allocator_allocation(
-      this->name_index, n, this->total_memory - this->amount_allocated));
+  if (ALLOCATOR_LOGGING) {
+
+    program_ctxt->logger->log_entry(logging::log_allocator_allocation(
+        this->name_index, n, this->total_memory - this->amount_allocated));
+  }
   if (this->amount_allocated >
       this->total_memory * ALLOCATOR_WARNING_THRESHOLD) {
     program_ctxt->logger->log_entry(logging::log_allocator_threshold_reached(

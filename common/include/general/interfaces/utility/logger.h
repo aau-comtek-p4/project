@@ -1,6 +1,7 @@
 #ifndef LOGGER_INTERFACE_H
 #define LOGGER_INTERFACE_H
 
+#include "general/interfaces/utility/metrics.h"
 #include "general/misc/errors.h"
 #include <cstdint>
 #define LOG_WARNING_PREFIX "\033[33m"
@@ -49,9 +50,6 @@ enum LogReason {
   REASON_COROUTINE_FINISHED,
   REASON_COROUTINE_TIMEOUT,
   REASON_COROUTINE_SUSPENDED,
-  // Clock
-  REASON_MISSED_TICK_OCCURED,
-  REASON_TICK_COMPLETE,
   //
   REASON_QUEUE_THRESHOLD,
   // Allocator
@@ -71,6 +69,10 @@ enum LogReason {
   REASON_SHUTDOWN,
   //
   REASON_TRACE_PRINT,
+  // Logs dropped
+  REASON_DROPPED_LOGS,
+  //
+  LOG_STAT_METRIC,
 };
 class Trace;
 union LogPayload {
@@ -89,21 +91,10 @@ union LogPayload {
     uint64_t parent_name_index;
     uint64_t trace_index;
   } coroutine_timeout;
-
   struct {
     uint64_t name_index;
     uint64_t actual_time_ns;
   } coroutine_suspended;
-  struct {
-    uint64_t deadline;
-    uint64_t actual;
-    uint64_t delta;
-  } missed_tick_occured;
-  struct {
-    uint64_t deadline;
-    uint64_t actual;
-    uint64_t time_remaining;
-  } tick_complete;
   struct {
     uint64_t name_index;
     uint64_t amount_allocated;
@@ -130,19 +121,18 @@ union LogPayload {
     uint64_t amount_freed;
     uint64_t amount_left;
   } allocator_freed;
-
   struct {
     IOMethod method;
     IOType type;
+    uint64_t name_index;
+    uint64_t trace_index;
     uint64_t parent_name_index;
-    uint64_t deadline;
-    uint64_t actual;
-    uint64_t delta;
   } io_timeout;
-
   struct {
     IOMethod method;
     IOType type;
+    uint64_t name_index;
+    uint64_t trace_index;
     uint64_t parent_name_index;
     int result;
   } io_completed;
@@ -150,11 +140,13 @@ union LogPayload {
   struct {
     IOMethod method;
     IOType type;
+    uint64_t name_index;
+    uint64_t trace_index;
     uint64_t parent_name_index;
     int error_no;
   } io_error;
   struct {
-    uint64_t deadline_tick;
+    uint64_t absolute_deadline_ms;
   } new_deadline;
 
   struct {
@@ -170,13 +162,20 @@ union LogPayload {
     uint64_t trace_id;
     uint64_t parent_id;
   } trace_print;
+  struct {
+    uint64_t dropped_amount;
+  } logs_dropped;
+  struct {
+    StatMetricType metric_type;
+    uint64_t avg_time;
+    uint64_t worst_case;
+  } log_stat_metric;
 };
 
 struct LogEntry {
   LogReason reason;
   LogLevel severity;
   uint64_t timestamp;
-  uint64_t tick_count;
   LogPayload payload;
 };
 LogLevel get_severity(LogReason reason);
@@ -209,17 +208,18 @@ LogEntry log_allocator_threshold_reached(uint64_t name_index,
 LogEntry log_allocator_free(uint64_t name_index, uint64_t amount_allocated,
                             uint64_t amount_left);
 
-LogEntry log_io_timeout(IOMethod io_method, IOType io_type,
-                        uint64_t parent_name_index, uint64_t deadline,
-                        uint64_t actual);
+LogEntry log_io_timeout(IOMethod io_method, IOType io_type, uint64_t name_index,
+                        uint64_t parent_name_index, uint64_t trace_index);
 
 LogEntry log_io_complete(IOMethod io_method, IOType io_type,
-                         uint64_t parent_name_index, uint64_t result);
+                         uint64_t name_index, uint64_t parent_name_index,
+                         uint64_t trace_index, uint64_t result);
 
-LogEntry log_io_error(IOMethod io_method, IOType io_type,
-                      uint64_t parent_name_index, uint64_t errno);
+LogEntry log_io_error(IOMethod io_method, IOType io_type, uint64_t name_index,
+                      uint64_t parent_name_index, uint64_t trace_index,
+                      uint64_t errno);
 
-LogEntry log_new_deadline(uint64_t deadline_tick);
+LogEntry log_new_deadline(uint64_t absolute_deadline_ms);
 
 LogEntry log_debug(const char *debug_str);
 
@@ -228,6 +228,9 @@ LogEntry log_shutdown(ErrorWrapper error_wrapper);
 LogEntry log_trace_print(uint64_t name_id, uint64_t trace_id,
                          uint64_t parent_id, uint64_t duration_ns,
                          uint64_t actual_duration_ns);
+LogEntry log_dropped_logs(uint64_t dropped_amount);
+LogEntry log_stat_metric(StatMetricType metric_type, uint64_t average_time,
+                         uint64_t worst_case);
 }; // namespace logging
 
 const char *parse_io_type(IOType type);

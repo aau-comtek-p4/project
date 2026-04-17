@@ -7,18 +7,18 @@
 #include "general/interfaces/utility/logger.h"
 #include <cstdint>
 #include <cstdio>
-#define MAX_LOGS 200
 #define LOG_FILE_NAME "log.txt"
-#define EVENT_LOG_FILE_NAME "event_logs.txt"
 class FileLogger : public LoggerInterface {
 private:
-  Queue<LogEntry, MAX_LOGS> msg_queue;
+  QueueInterface<LogEntry> *msg_queue;
   int file_descriptor;
   char out_buf[MAX_LOG_SIZE];
   LogSerializerInterface *serializer;
+  uint64_t dropped_count = 0;
 
 public:
-  FileLogger(LogSerializerInterface *serializer);
+  FileLogger(QueueInterface<LogEntry> *msg_queue,
+             LogSerializerInterface *serializer);
   void log_entry(LogEntry entry) noexcept override;
 
   void submit(uint64_t timeout) noexcept override;

@@ -1,4 +1,6 @@
 build
 .env
 .cache
+log.txt
+test.*
 venv

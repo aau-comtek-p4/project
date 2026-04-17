@@ -9,23 +9,19 @@
 
 class BasicEventLoop : public EventLoopInterface {
 private:
-  QueueInterface<std::coroutine_handle<>> *ready_queue;
-  QueueInterface<std::coroutine_handle<>> *staging_queue;
+  QueueInterface<std::coroutine_handle<>> *general_queue;
   bool running;
+  uint64_t max_ops;
 
 public:
-  BasicEventLoop(QueueInterface<std::coroutine_handle<>> *ready_queue,
-                 QueueInterface<std::coroutine_handle<>> *staging_queue);
+  BasicEventLoop(QueueInterface<std::coroutine_handle<>> *general_queue,
+                 uint64_t max_ops);
   std::expected<void, ErrorWrapper>
   enque(std::coroutine_handle<> handle) override;
-  std::expected<void, ErrorWrapper>
-  enque_staging(std::coroutine_handle<> handle) override;
+  std::expected<void, ErrorWrapper> enque_future(std::coroutine_handle<> handle,
+                                                 uint64_t time_ms) override;
 
-  std::expected<void, ErrorWrapper> set_future(std::coroutine_handle<> handle,
-                                               uint64_t future_tick) override;
-
-  std::expected<void, ErrorWrapper> run_step(uint64_t cqe_timeout,
-                                             uint64_t log_timeout);
+  std::expected<void, ErrorWrapper> run_step();
   std::expected<void, ErrorWrapper> step() override;
   std::expected<void, ErrorWrapper> run() override;
   std::expected<void, ErrorWrapper> run(uint64_t timeout) override;

@@ -24,7 +24,7 @@ template <typename T> std::expected<void, ErrorWrapper> spawn(T &&routine) {
 
   typed_handle.promise().ctxt.spawned = true;
   std::coroutine_handle<> handle = typed_handle;
-  auto enqueue_res = program_ctxt->loop->enque_staging(std::move(handle));
+  auto enqueue_res = program_ctxt->loop->enque(std::move(handle));
   if (enqueue_res.has_value()) {
     return {};
   }
@@ -32,14 +32,13 @@ template <typename T> std::expected<void, ErrorWrapper> spawn(T &&routine) {
 }
 
 template <typename T>
-std::expected<void, ErrorWrapper> spawn_future(T &&routine,
-                                               uint64_t future_tick_offset) {
+std::expected<void, ErrorWrapper> spawn_future(T &&routine, uint64_t time_ms) {
   auto typed_handle = routine.handle;
   typed_handle.promise().ctxt.spawned = true;
   std::coroutine_handle<> handle = typed_handle;
 
   auto set_future_res =
-      program_ctxt->loop->set_future(std::move(handle), future_tick_offset);
+      program_ctxt->loop->enque_future(std::move(handle), time_ms);
 
   if (set_future_res.has_value()) {
     return {};
@@ -47,7 +46,7 @@ std::expected<void, ErrorWrapper> spawn_future(T &&routine,
   return std::unexpected(set_future_res.error());
 }
 
-class Job {
+class Job : public Coroutine {
 public:
   struct promise_type;
   using handle_type = std::coroutine_handle<promise_type>;
@@ -92,9 +91,11 @@ struct Job::promise_type : public shared_promise_type {
     this->ctxt.trace.print();
     uint64_t parent_id =
         this->ctxt.parent_ctxt ? this->ctxt.parent_ctxt->name_id : 0;
-    program_ctxt->logger->log_entry(logging::log_coroutine_finished(
-        this->ctxt.name_id, parent_id, this->ctxt.trace.actual_duration_ns,
-        this->ctxt.trace.id));
+    if (COROUTINE_LOGGING) {
+      program_ctxt->logger->log_entry(logging::log_coroutine_finished(
+          this->ctxt.name_id, parent_id, this->ctxt.trace.actual_duration_ns,
+          this->ctxt.trace.id));
+    }
     return {};
   }
   void *operator new(size_t n) {
@@ -102,6 +103,7 @@ struct Job::promise_type : public shared_promise_type {
     if (!res.has_value()) {
       safe_shutdown(res.error());
     }
+
     return res.value();
   }
 

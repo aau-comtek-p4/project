@@ -9,6 +9,6 @@ Task<int> sleep_for_routine() {
   self_ctxt->trace.suspend_trace();
   co_return 0;
 }
-SkipAwaiter sleep_for(uint64_t timeout_tick) {
-  return SkipAwaiter(timeout_tick);
+SkipAwaiter sleep_for(uint64_t sleep_time_ms) {
+  return SkipAwaiter(sleep_time_ms);
 }

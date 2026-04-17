@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <cstring>
 
+#define NAME_LEN 20
+#define NAME_AMOUNT 30
+
 #define NAME_NO 0
 #define NAME_PROGRAM_ALLOCATOR 1
 #define NAME_FRAME_ALLOCATOR 2

@@ -37,11 +37,7 @@ BlockingFileWriteIOTransport::io_open(IOAddress addr) {
   self_ctxt->trace.start();
   int res = open(addr.file_path, O_RDWR | O_CREAT | O_APPEND, 0644);
 
-  if (res < 0) {
-    co_return std::unexpected(
-        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = errno});
-  }
-  co_return res;
+  co_return process_io_res(self_ctxt, IOMethod::IO_FILE, IOType::OPEN, res);
 }
 Task<std::expected<int, ErrorWrapper>>
 BlockingFileWriteIOTransport::io_read(IOAddress addr, uint8_t *buf,
@@ -51,11 +47,8 @@ BlockingFileWriteIOTransport::io_read(IOAddress addr, uint8_t *buf,
   self_ctxt->set_name(NAME_IO_FILE_READ);
   self_ctxt->trace.start();
   int res = read(addr.fd, buf, buf_size);
-  if (res < 0) {
-    co_return std::unexpected(
-        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = errno});
-  }
-  co_return res;
+
+  co_return process_io_res(self_ctxt, IOMethod::IO_FILE, IOType::READ, res);
 }
 Task<std::expected<int, ErrorWrapper>>
 BlockingFileWriteIOTransport::io_write(IOAddress addr, const uint8_t *buf,
@@ -66,11 +59,8 @@ BlockingFileWriteIOTransport::io_write(IOAddress addr, const uint8_t *buf,
   self_ctxt->trace.start();
 
   int res = write(addr.fd, buf, buf_size);
-  if (res < 0) {
-    co_return std::unexpected(
-        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = errno});
-  }
-  co_return res;
+
+  co_return process_io_res(self_ctxt, IOMethod::IO_FILE, IOType::WRITE, res);
 }
 Task<std::expected<int, ErrorWrapper>>
 BlockingFileWriteIOTransport::io_close(IOAddress addr) {
@@ -78,9 +68,6 @@ BlockingFileWriteIOTransport::io_close(IOAddress addr) {
   self_ctxt->set_name(NAME_IO_FILE_CLOSE);
   self_ctxt->trace.start();
   int res = close(addr.fd);
-  if (res < 0) {
-    co_return std::unexpected(
-        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = errno});
-  }
-  co_return res;
+
+  co_return process_io_res(self_ctxt, IOMethod::IO_FILE, IOType::CLOSE, res);
 }

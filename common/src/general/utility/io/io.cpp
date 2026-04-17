@@ -1,11 +1,14 @@
 #include "general/interfaces/io/io.h"
 #include "general/common.h"
+#include "general/interfaces/event_loop/co_routine.h"
 #include "general/interfaces/storage/allocator.h"
 #include "general/interfaces/utility/logger.h"
+#include "general/misc/context.h"
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
 #include <cmath>
 #include <cstdint>
+#include <expected>
 
 IOHandler::IOHandler(AllocatorInterface *transport_allocator) {
   this->transport_allocator = transport_allocator;
@@ -43,3 +46,26 @@ void IOHandler::process_all(uint64_t timeout) {
 void IOHandler::cancel(IOMethod io_method, const void *user_data) {
   this->transports[io_method].transport_ptr.value()->cancel(user_data);
 };
+std::expected<int, ErrorWrapper> process_io_res(CoRoutineCtxt *ctxt,
+                                                IOMethod io_method,
+                                                IOType io_type, int res) {
+  uint64_t parent_index = ctxt->parent_ctxt ? ctxt->parent_ctxt->name_id : 0;
+  if (ctxt->cancelled) {
+    program_ctxt->logger->log_entry(logging::log_io_timeout(
+        io_method, io_type, ctxt->name_id, parent_index, ctxt->trace.id));
+    return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
+                                        .error = CustomErrors::TIMEOUT});
+  }
+
+  if (res < 0) {
+    program_ctxt->logger->log_entry(logging::log_io_error(
+        io_method, io_type, ctxt->name_id, parent_index, ctxt->trace.id, res));
+    return std::unexpected(
+        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = errno});
+  }
+  if (IO_LOGGING) {
+    program_ctxt->logger->log_entry(logging::log_io_complete(
+        io_method, io_type, ctxt->name_id, parent_index, ctxt->trace.id, res));
+  }
+  return res;
+}

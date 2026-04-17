@@ -3,6 +3,7 @@
 #include "general/interfaces/utility/metrics.h"
 #include <cstddef>
 #include <cstdint>
+#define METRIC_LOG_INTERVAL 200
 struct StandardMetricHolder {
   size_t packet_loss;
   size_t tick_miss;
@@ -30,11 +31,15 @@ struct StandardMetricHolder {
 };
 class StandardMetrics : public MetricsInterface {
 private:
+  StatMetric stat_metrics[StatMetricType::LATENCY_METRIC_END];
   StandardMetricHolder metrics_holder;
-  void print_metric(MetricType metric_type);
+  void print_metric(StatMetricType metric_type);
 
 public:
+  StandardMetrics();
   void document_metric(MetricType metric_type) override;
+  void document_statistics_metric_metric(StatMetricType metric_type,
+                                         uint64_t latency_ns) override;
   uint64_t get_metric(MetricType metric_type) override;
   void print_metrics() override;
 };

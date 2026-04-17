@@ -8,11 +8,14 @@
 
 #define COROUTINE_TAG "COROUTINE"
 #define COROUTINE_ERR_TAG "COROUTINE ERROR"
+#define COROUTINE_LOGGING 1
+class Coroutine {};
 class IOAwaitInterface;
 
 struct CoRoutineCtxt {
   bool cancelled = false;
   bool spawned = false;
+  bool log_debug = true;
   CoRoutineCtxt *parent_ctxt = nullptr;
   IOAwaitInterface *io_address = nullptr;
   std::coroutine_handle<> handle;
@@ -51,7 +54,7 @@ template <typename Inner> struct TraceAwaiter {
   bool await_ready() { return inner.await_ready(); }
   template <typename Promise>
   auto await_suspend(std::coroutine_handle<Promise> h) {
-    this->ctxt->trace.suspend_trace();
+    this->ctxt->trace.suspend_trace(h.promise().ctxt.log_debug);
     return inner.await_suspend(h);
   }
   auto await_resume() {

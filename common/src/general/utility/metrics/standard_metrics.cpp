@@ -8,6 +8,7 @@
 #include <cinttypes>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 const char *get_metric_type(MetricType metric_type) {
   switch (metric_type) {
   case MetricType::CONNECTION_RECEIVED:
@@ -190,36 +191,69 @@ uint64_t StandardMetrics::get_metric(MetricType metric_type) {
   return 0;
 }
 
-void StandardMetrics::print_metric(MetricType metric_type) {
-  /*
-program_ctxt->logger->log_info(METRIC_TAG, "[%s]: [%" PRIu64 "]",
-                           get_metric_type(metric_type),
-                           this->get_metric(metric_type));
-                                                           */
-}
+void StandardMetrics::print_metric(StatMetricType metric_type) {
+  uint64_t avg = this->stat_metrics[metric_type].count
+                     ? this->stat_metrics[metric_type].total /
+                           this->stat_metrics[metric_type].count
+                     : 0;
+  program_ctxt->logger->log_entry(
+      logging::log_stat_metric(metric_type, avg
 
+                               ,
+                               this->stat_metrics[metric_type].worst_case));
+}
 void StandardMetrics::print_metrics() {
-  this->print_metric(MetricType::CONNECTION_RECEIVED);
-  this->print_metric(MetricType::MESSAGE_RECEIVED);
-  this->print_metric(MetricType::MESSAGE_SENT);
-  this->print_metric(MetricType::COROUTINES_FREED);
-  this->print_metric(MetricType::PACKET_LOSS);
-  this->print_metric(MetricType::TICK_MISS);
-  this->print_metric(MetricType::SURPASSED_DEADLINE);
-  this->print_metric(MetricType::FAILED_RECEIVE);
-  this->print_metric(MetricType::FAILED_CONNECT);
-  this->print_metric(MetricType::FAILED_SEND);
-  this->print_metric(MetricType::COROUTINE_CREATED);
-  this->print_metric(MetricType::ACCEPTED_CONNECTION);
-  this->print_metric(MetricType::FAILED_ACCEPT);
-  this->print_metric(MetricType::OPENED_FILE);
-  this->print_metric(MetricType::FILE_WRITE);
-  this->print_metric(MetricType::FAILED_OPENED);
-  this->print_metric(MetricType::WRITE_FAILED);
-  this->print_metric(MetricType::FILE_READ);
-  this->print_metric(MetricType::READ_FAILED);
-  this->print_metric(MetricType::CLOSED_FD);
-  this->print_metric(MetricType::CLOSED_FAILED);
-  this->print_metric(MetricType::DISCONNECT);
-  this->print_metric(MetricType::REAL_TICK);
+  this->print_metric(StatMetricType::METRIC_LOG_DROP);
+  this->print_metric(StatMetricType::METRIC_SUSPEND_TIME);
+  this->print_metric(StatMetricType::METRIC_LOOP_TIME);
+  this->print_metric(StatMetricType::METRIC_LOG_TIME);
+}
+StandardMetrics::StandardMetrics() {
+  /*
+this->stat_metrics[StatMetricType::METRIC_LOOP_TIME].print_interval = 4000;
+this->stat_metrics[StatMetricType::METRIC_LOG_TIME].print_interval = 100;
+this->stat_metrics[StatMetricType::METRIC_SUSPEND_TIME].print_interval = 10;
+this->stat_metrics[StatMetricType::METRIC_LOG_DROP].print_interval = 1;
+*/
+  this->stat_metrics[StatMetricType::METRIC_LOOP_TIME].print_interval = 0;
+  this->stat_metrics[StatMetricType::METRIC_LOG_TIME].print_interval = 0;
+  this->stat_metrics[StatMetricType::METRIC_SUSPEND_TIME].print_interval = 0;
+  this->stat_metrics[StatMetricType::METRIC_LOG_DROP].print_interval = 0;
+}
+const char *parse_latency_metric_type(StatMetricType metric_type) {
+  switch (metric_type) {
+  case StatMetricType::METRIC_LOG_TIME:
+    return "log_time";
+  case StatMetricType::METRIC_LOOP_TIME:
+    return "loop_time";
+  case StatMetricType::METRIC_SUSPEND_TIME:
+    return "suspend_time";
+  case StatMetricType::METRIC_LOG_DROP:
+    return "dropped_log";
+  case StatMetricType::LATENCY_METRIC_END:
+    return "unkown";
+  }
+  return "unkown";
+}
+void StandardMetrics::document_statistics_metric_metric(
+    StatMetricType metric_type, uint64_t latency) {
+  this->stat_metrics[metric_type].count += 1;
+  this->stat_metrics[metric_type].total += latency;
+  if (this->stat_metrics[metric_type].worst_case < latency) {
+    this->stat_metrics[metric_type].worst_case = latency;
+  }
+  if (this->stat_metrics[metric_type].print_interval == 0) {
+    return;
+  }
+
+  uint64_t avg = this->stat_metrics[metric_type].count
+                     ? this->stat_metrics[metric_type].total /
+                           this->stat_metrics[metric_type].count
+                     : 0;
+  if (this->stat_metrics[metric_type].count %
+          this->stat_metrics[metric_type].print_interval ==
+      0) {
+    program_ctxt->logger->log_entry(logging::log_stat_metric(
+        metric_type, avg, this->stat_metrics[metric_type].worst_case));
+  }
 }

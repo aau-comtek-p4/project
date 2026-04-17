@@ -5,28 +5,22 @@
 #include "general/interfaces/io/io.h"
 #include "general/interfaces/utility/clock.h"
 #include "general/interfaces/utility/logger.h"
+#include "general/interfaces/utility/metrics.h"
 #include "general/misc/errors.h"
 #include <algorithm>
+#include <coroutine>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <utility>
 
 BasicEventLoop::BasicEventLoop(
-    QueueInterface<std::coroutine_handle<>> *ready_queue,
-    QueueInterface<std::coroutine_handle<>> *staging_queue)
-    : ready_queue(ready_queue), staging_queue(staging_queue), running(true) {}
+    QueueInterface<std::coroutine_handle<>> *general_queue, uint64_t max_ops)
+    : general_queue(general_queue), running(true), max_ops(max_ops) {}
 
 std::expected<void, ErrorWrapper>
 BasicEventLoop::enque(std::coroutine_handle<> handle) {
-  auto res = this->ready_queue->enque(std::move(handle));
-  if (res.has_value()) {
-    return {};
-  }
-  return std::unexpected(res.error());
-};
-std::expected<void, ErrorWrapper>
-BasicEventLoop::enque_staging(std::coroutine_handle<> handle) {
-  auto res = this->staging_queue->enque(std::move(handle));
+  auto res = this->general_queue->enque(std::move(handle));
   if (res.has_value()) {
     return {};
   }
@@ -34,57 +28,52 @@ BasicEventLoop::enque_staging(std::coroutine_handle<> handle) {
 };
 
 std::expected<void, ErrorWrapper>
-BasicEventLoop::set_future(std::coroutine_handle<> handle,
-                           uint64_t future_tick) {
-
-  auto res = program_ctxt->deadline_tracker->add_deadline(std::move(handle),
-                                                          future_tick);
+BasicEventLoop::enque_future(std::coroutine_handle<> handle, uint64_t time_ms) {
+  auto res =
+      program_ctxt->deadline_tracker->add_deadline(std::move(handle), time_ms);
   if (res.has_value()) {
     return {};
   }
   return std::unexpected(res.error());
 }
 
-std::expected<void, ErrorWrapper>
-BasicEventLoop::run_step(uint64_t cqe_timeout, uint64_t log_timeout) {
-  std::swap(this->ready_queue, this->staging_queue);
-  auto get_head_handle_res = this->ready_queue->deque();
-  while (get_head_handle_res.has_value()) {
+std::expected<void, ErrorWrapper> BasicEventLoop::run_step() {
+  std::expected<std::coroutine_handle<>, ErrorWrapper> get_head_handle_res;
+  uint64_t loop_start = program_ctxt->clock->rt_since_start_ns();
+  uint64_t ops = 0;
+  do {
+    get_head_handle_res = this->general_queue->deque();
+    if (!get_head_handle_res.has_value()) {
+      break;
+    }
     std::coroutine_handle<> handler = get_head_handle_res.value();
     if (handler) {
       if (!handler.done()) {
         handler.resume();
+        ops += 1;
       }
     }
 
-    get_head_handle_res = this->ready_queue->deque();
-  }
+  } while (ops < max_ops && this->running);
 
   auto res = program_ctxt->deadline_tracker->enforce_deadlines();
   program_ctxt->io->submit_all();
-  program_ctxt->io->process_all(cqe_timeout);
-  program_ctxt->logger->submit(log_timeout);
+  program_ctxt->io->process_all(1 * NS_PR_MS);
+  program_ctxt->logger->submit(1 * NS_PR_MS);
+  program_ctxt->metrics->document_statistics_metric_metric(
+      StatMetricType::METRIC_LOOP_TIME,
+      program_ctxt->clock->rt_since_start_ns() - loop_start);
   return {};
 }
 
 std::expected<void, ErrorWrapper> BasicEventLoop::step() {
+  auto res = this->run_step();
 
-  auto res = this->run_step(program_ctxt->clock->time_until_tick() * 0.4,
-                            program_ctxt->clock->time_until_tick() * 0.4);
-
-  uint64_t missed_ticks = program_ctxt->clock->tick();
-
-  uint64_t remaining_steps = std::min(missed_ticks, (uint64_t)MAX_MISSED_TICK);
-
-  for (size_t i = 0; i < remaining_steps; i++) {
-    res = this->run_step(0, 0);
-    program_ctxt->clock->tick_catchup();
-  }
   return {};
 }
 
-std::expected<void, ErrorWrapper> BasicEventLoop::run(uint64_t time) {
-  while (this->running && program_ctxt->clock->tick_now() < time) {
+std::expected<void, ErrorWrapper> BasicEventLoop::run(uint64_t time_ms) {
+  while (this->running && program_ctxt->clock->rt_since_start_ms() < time_ms) {
     auto res = this->step();
   }
   return {};

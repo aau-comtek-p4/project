@@ -5,10 +5,12 @@
 #include "general/interfaces/utility/logger.h"
 #include "general/misc/context.h"
 #include "general/misc/errors.h"
+#include "general/misc/shutdown.h"
 #include <cassert>
 #include <coroutine>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <expected>
 #include <utility>
 
@@ -34,11 +36,8 @@ private:
 public:
   Queue(uint64_t name_index) { this->name_index = name_index; };
   std::expected<void, ErrorWrapper> enque(T &&val) override {
-    if (queue_items > queue_size * QUEUE_WARNING_THRESHOLD) {
-      program_ctxt->logger->log_entry(logging::log_queue_threshold(
-          this->name_index, this->queue_items, queue_size - this->queue_items));
-    }
     if (queue_items >= queue_size) {
+      safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM, .error = 1});
       return std::unexpected(
           ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
                        .error = CapacityError::INSUFFICIENT_SPACE});

@@ -10,16 +10,17 @@
 
 #define DEADLINE_TAG "DEADLINE"
 #define DEADLINE_ERROR_TAG "DEADLINE ERROR"
+#define DEADLINE_LOGGING 0
 
 struct Deadline {
   std::coroutine_handle<> handle;
-  uint64_t deadline_tick;
+  uint64_t absolute_deadline_ms;
 };
 
 class DeadlineStorageInterface {
 public:
   virtual std::expected<void, ErrorWrapper>
-  add_deadline(std::coroutine_handle<> handle, uint64_t remaining_tick) = 0;
+  add_deadline(std::coroutine_handle<> handle, uint64_t time_ms) = 0;
   virtual std::expected<void, ErrorWrapper> enforce_deadlines() = 0;
 };
 

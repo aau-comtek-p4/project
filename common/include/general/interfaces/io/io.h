@@ -14,16 +14,16 @@
 
 #define IO_TAG "IO"
 #define IO_ERROR_TAG "IO ERROR"
+#define IO_LOGGING 0
 
 class IOAwaitInterface {
 public:
   IOType type;
   IOMethod io_method;
   std::coroutine_handle<> handle;
-  virtual void set_result(int result) = 0;
   virtual const char *get_type() = 0;
   virtual bool await_ready() = 0;
-  virtual void
+  virtual bool
   await_suspend(std::coroutine_handle<
                 Task<std::expected<int, ErrorWrapper>>::promise_type>
                     handle) = 0;
@@ -61,5 +61,9 @@ template <typename T> T *IOHandler::get_transport(IOMethod io_method) {
   T *transport_ptr = (T *)this->transports[io_method].transport_ptr.value();
   return transport_ptr;
 }
+
+std::expected<int, ErrorWrapper> process_io_res(CoRoutineCtxt *ctxt,
+                                                IOMethod io_method,
+                                                IOType io_type, int res);
 
 #endif

@@ -13,7 +13,7 @@
 #include <filesystem>
 
 template <uint64_t bucket_size> struct Bucket {
-  std::byte buffer[bucket_size];
+  std::byte buffer[bucket_size] = {0};
   size_t allocation_size;
   Bucket<bucket_size> *next_ptr;
 };
@@ -67,9 +67,11 @@ BucketAllocator<bucket_count, bucket_size>::allocate(uint64_t n) {
   this->free_bucket_header_ptr = current_bucket_index->next_ptr;
   this->amount_allocated += n;
 
-  program_ctxt->logger->log_entry(logging::log_bucket_allocator_allocation(
-      this->name_index, n, this->total_memory - this->amount_allocated,
-      bucket_size));
+  if (ALLOCATOR_LOGGING) {
+    program_ctxt->logger->log_entry(logging::log_bucket_allocator_allocation(
+        this->name_index, n, this->total_memory - this->amount_allocated,
+        bucket_size));
+  }
 
   if (this->allocated_buckets_count >
       bucket_count * ALLOCATOR_WARNING_THRESHOLD) {
@@ -117,9 +119,13 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
   this->allocated_buckets_count -= 1;
   cur_bucket_ptr->allocation_size = 0;
   this->amount_allocated -= used_memory;
-  program_ctxt->logger->log_entry(
-      logging::log_allocator_free(this->name_index, used_memory,
-                                  this->total_memory - this->amount_allocated));
+
+  if (ALLOCATOR_LOGGING) {
+    program_ctxt->logger->log_entry(logging::log_allocator_free(
+        this->name_index, used_memory,
+        this->total_memory - this->amount_allocated));
+  }
+
   return {};
 }
 

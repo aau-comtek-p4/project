@@ -6,7 +6,7 @@ struct YieldAwaiter {
   bool await_ready() { return false; }
   void await_suspend(std::coroutine_handle<> h) {
 
-    auto _ = program_ctxt->loop->enque_staging(h);
+    auto _ = program_ctxt->loop->enque(h);
   }
   void await_resume() {}
 };

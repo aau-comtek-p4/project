@@ -19,9 +19,8 @@ private:
 public:
   DeadlineMinHeap(Deadline *heaper_buffer, size_t buffer_size);
 
-  std::expected<void, ErrorWrapper>
-  add_deadline(std::coroutine_handle<> handle,
-               uint64_t remaining_tick) override;
+  std::expected<void, ErrorWrapper> add_deadline(std::coroutine_handle<> handle,
+                                                 uint64_t time_ms) override;
   std::expected<void, ErrorWrapper> enforce_deadlines() override;
 };
 

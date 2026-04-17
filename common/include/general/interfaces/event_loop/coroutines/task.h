@@ -25,7 +25,7 @@
 #include <type_traits>
 #include <utility>
 
-template <typename T> class Task {
+template <typename T> class Task : public Coroutine {
 public:
   using value_type = T;
   struct promise_type;
@@ -67,7 +67,10 @@ Task<T>::await_suspend(std::coroutine_handle<U> caller) {
   this->handle.promise().ctxt.parent_ctxt = &caller.promise().ctxt;
   this->handle.promise().ctxt.trace.parent_id =
       this->handle.promise().ctxt.parent_ctxt->trace.id;
-  auto _ = program_ctxt->loop->enque_staging(this->handle);
+  auto res = program_ctxt->loop->enque(this->handle);
+  if (!res.has_value()) {
+    safe_shutdown(res.error());
+  }
   return std::noop_coroutine();
 }
 
@@ -112,7 +115,7 @@ struct Task<T>::promise_type : public shared_promise_type {
       if (parent_ctxt && !own_ctxt->cancelled) {
         parent_ctxt->trace.add_time(own_ctxt->trace.duration_ns);
         parent_ctxt->trace.add_actual_time(own_ctxt->trace.actual_duration_ns);
-        auto res = program_ctxt->loop->enque_staging(parent_ctxt->handle);
+        auto res = program_ctxt->loop->enque(parent_ctxt->handle);
         if (!res.has_value()) {
           safe_shutdown(res.error());
         }
@@ -153,9 +156,11 @@ struct Task<T>::promise_type : public shared_promise_type {
     this->ctxt.trace.suspend_trace();
     uint64_t parent_id =
         this->ctxt.parent_ctxt ? this->ctxt.parent_ctxt->name_id : 0;
-    program_ctxt->logger->log_entry(logging::log_coroutine_finished(
-        this->ctxt.name_id, parent_id, this->ctxt.trace.actual_duration_ns,
-        this->ctxt.trace.id));
+    if (COROUTINE_LOGGING) {
+      program_ctxt->logger->log_entry(logging::log_coroutine_finished(
+          this->ctxt.name_id, parent_id, this->ctxt.trace.actual_duration_ns,
+          this->ctxt.trace.id));
+    }
     return {};
   }
   void *operator new(size_t n) {
@@ -163,6 +168,7 @@ struct Task<T>::promise_type : public shared_promise_type {
     if (!res.has_value()) {
       safe_shutdown(res.error());
     }
+
     return res.value();
   }
 

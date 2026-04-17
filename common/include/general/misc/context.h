@@ -1,10 +1,8 @@
 #ifndef CONTEXT_H
 #define CONTEXT_H
-#include "general/common.h"
-#include "general/interfaces/simulator/random.h"
-#include "general/interfaces/simulator/random/seeded_random.h"
-#include "general/misc/names.h"
 #include <cstdint>
+#include <general/common.h>
+#include <general/misc/names.h>
 #define CONTEXT_TAG "CONTEXT"
 #define CONTEXT_ERROR_TAG "CONTEXT ERROR"
 enum CtxtClockType {
@@ -31,21 +29,19 @@ enum ContextType {
   SIMULATOR,
 };
 struct ContextSettings {
-  static constexpr uint64_t clock_tick_ms = 0;
   static constexpr uint64_t max_coroutine_amount = 0;
   static constexpr uint64_t max_coroutine_size = 0;
-  static constexpr uint64_t max_coroutine_generator_size = 0;
-  static constexpr uint64_t max_coroutine_generator_amount = 0;
   static constexpr uint64_t max_buffer_amount = 0;
   static constexpr uint64_t max_buffer_size = 0;
   static constexpr uint64_t max_deadlines = 0;
   static constexpr uint64_t max_queue_depth = 0;
-  static constexpr uint64_t max_ready_queue = 0;
-  static constexpr uint64_t max_staging_queue = 0;
+  static constexpr uint64_t max_loop_queue = 0;
   static constexpr uint64_t max_total_size = 0;
   static constexpr uint64_t max_io_transport_size = 0;
-  static constexpr uint64_t max_trace_amount = 0;
+  static constexpr uint64_t max_log_amount = 0;
+  static constexpr uint64_t random_seed = 0;
 };
+
 template <typename Setting> struct ContextConfig {
   ContextType ctx_type;
   CtxtClockType clock_type;
@@ -69,5 +65,4 @@ struct ProgramContext {
   MetricsInterface *metrics = nullptr;
   RandomInterface *random = nullptr;
 };
-
 #endif

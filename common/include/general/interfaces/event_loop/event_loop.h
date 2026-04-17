@@ -13,11 +13,9 @@ class EventLoopInterface {
 public:
   virtual std::expected<void, ErrorWrapper>
   enque(std::coroutine_handle<> handle) = 0;
-  virtual std::expected<void, ErrorWrapper>
-  enque_staging(std::coroutine_handle<> handle) = 0;
 
   virtual std::expected<void, ErrorWrapper>
-  set_future(std::coroutine_handle<> handle, uint64_t future_tick) = 0;
+  enque_future(std::coroutine_handle<> handle, uint64_t future_tick) = 0;
 
   virtual std::expected<void, ErrorWrapper> step() = 0;
   virtual std::expected<void, ErrorWrapper> run() = 0;

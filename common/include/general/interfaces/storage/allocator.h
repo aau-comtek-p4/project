@@ -11,6 +11,7 @@
 #define ALLOCATOR_TAG "ALLOCATOR"
 #define ALLOCATOR_ERROR_TAG "ALLOCATOR ERROR"
 #define ALLOCATOR_WARNING_THRESHOLD 0.8
+#define ALLOCATOR_LOGGING 1
 class AllocatorInterface {
 public:
   uint64_t amount_allocated;
