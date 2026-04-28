@@ -3,4 +3,5 @@ build
 .cache
 log.txt
 test.*
+*log*
 venv
