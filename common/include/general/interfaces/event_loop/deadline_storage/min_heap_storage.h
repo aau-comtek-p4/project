@@ -22,6 +22,7 @@ public:
   std::expected<void, ErrorWrapper> add_deadline(std::coroutine_handle<> handle,
                                                  uint64_t time_ms) override;
   std::expected<void, ErrorWrapper> enforce_deadlines() override;
+  std::optional<uint64_t> get_smallest_deadline_ns() override;
 };
 
 #endif

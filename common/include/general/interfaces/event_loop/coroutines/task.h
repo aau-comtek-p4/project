@@ -147,7 +147,7 @@ struct Task<T>::promise_type : public shared_promise_type {
   void return_value(T val) { this->result = val; }
 
   void unhandled_exception() {
-    ErrorWrapper error{.tag = ErrorWrapper::ERRNO, .error = errno};
+    ErrorWrapper error{.error = errno, .tag = ErrorWrapper::ERRNO};
     safe_shutdown(error);
   }
 

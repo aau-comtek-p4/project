@@ -1,7 +1,10 @@
 #ifndef CONTEXT_LINUX_H
 #define CONTEXT_LINUX_H
 
+#include "common/io/io.h"
+#include "common/io/transports/network/liburing_wifi_udp_transport.h"
 #include "common/io/transports/storage/liburing_file_write.h"
+#include "common/io/transports/storage/serial_transport.h"
 #include "common/logger/file_logger.h"
 #include "general/common.h"
 #include "general/interfaces/io/io.h"
@@ -16,6 +19,7 @@
 #include "general/misc/shutdown.h"
 #include <cstdint>
 #include <cstdio>
+#include <liburing.h>
 
 template <typename Config>
 void innit_logger(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
@@ -57,7 +61,12 @@ void innit_logger(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
   }
   case CtxtLoggerType::ESP_LOGGER: {
     fprintf(stderr, "ESP logger not allowed on linux");
-    safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM, .error = 1});
+    safe_shutdown(ErrorWrapper{.error = 1, .tag = ErrorWrapper::CUSTOM});
+    return;
+  }
+  case CtxtLoggerType::ESP_QUEUE_LOGGER: {
+    fprintf(stderr, "ESP queue logger not allowed on linux");
+    safe_shutdown(ErrorWrapper{.error = 1, .tag = ErrorWrapper::CUSTOM});
     return;
   }
   }
@@ -66,6 +75,7 @@ void innit_logger(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
 template <typename Config>
 void innit_io(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
               AllocatorInterface *allocator) {
+  io_uring_queue_init(ctx_config.settings.max_queue_depth, &program_uring, 0);
   uint8_t *transport_buffer =
       (uint8_t *)allocator->allocate(ctx_config.settings.max_io_transport_size)
           .value();
@@ -77,10 +87,15 @@ void innit_io(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
   IOHandler *io_handler_ptr =
       (IOHandler *)allocator->allocate(sizeof(IOHandler)).value();
   new (io_handler_ptr) IOHandler(io_transport_allocator);
-  program_ctxt->io = io_handler_ptr;
-  new (program_ctxt->io->register_transport(
-      IOMethod::IO_FILE, sizeof(LiburingFileWriteIOTransport)))
-      LiburingFileWriteIOTransport(ctx_config.settings.max_queue_depth);
+  ctxt->io = io_handler_ptr;
+  new (ctxt->io->register_transport(IOMethod::IO_FILE,
+                                    sizeof(LiburingFileWriteIOTransport)))
+      LiburingFileWriteIOTransport;
+  new (ctxt->io->register_transport(
+      IOMethod::IO_SERIAL, sizeof(SerialIOTransport))) SerialIOTransport;
+  new (ctxt->io->register_transport(IOMethod::IO_WIFI_UDP,
+                                    sizeof(LiburingWIFIUDPTransport)))
+      LiburingWIFIUDPTransport;
   /*
   new (program_ctxt->io->register_transport(
       IOMethod::IO_FILE, sizeof(BlockingFileWriteIOTransport)))

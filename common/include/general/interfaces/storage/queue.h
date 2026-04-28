@@ -1,4 +1,5 @@
 #ifndef QUEUE_INTERFACE_H
+
 #define QUEUE_INTERFACE_H
 
 #include "general/common.h"
@@ -23,6 +24,7 @@ public:
   uint64_t name_index;
   virtual std::expected<void, ErrorWrapper> enque(T &&val) = 0;
   virtual std::expected<T, ErrorWrapper> deque() = 0;
+  virtual std::expected<T, ErrorWrapper> peek() = 0;
 };
 
 template <typename T, size_t queue_size>
@@ -37,10 +39,9 @@ public:
   Queue(uint64_t name_index) { this->name_index = name_index; };
   std::expected<void, ErrorWrapper> enque(T &&val) override {
     if (queue_items >= queue_size) {
-      safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM, .error = 1});
       return std::unexpected(
-          ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
-                       .error = CapacityError::INSUFFICIENT_SPACE});
+          ErrorWrapper{.error = CapacityError::INSUFFICIENT_SPACE,
+                       .tag = ErrorWrapper::CUSTOM});
     }
     storage[tail] = std::move(val);
     tail = (tail + 1) % queue_size;
@@ -50,12 +51,21 @@ public:
   std::expected<T, ErrorWrapper> deque() override {
     if (queue_items <= 0) {
       return std::unexpected(
-          ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
-                       .error = CapacityError::BUFFER_UNDERFLOW});
+          ErrorWrapper{.error = CapacityError::BUFFER_UNDERFLOW,
+                       .tag = ErrorWrapper::CUSTOM});
     }
     T ptr = storage[head];
     head = (head + 1) % queue_size;
     queue_items -= 1;
+    return ptr;
+  }
+  std::expected<T, ErrorWrapper> peek() override {
+    if (queue_items <= 0) {
+      return std::unexpected(
+          ErrorWrapper{.error = CapacityError::BUFFER_UNDERFLOW,
+                       .tag = ErrorWrapper::CUSTOM});
+    }
+    T ptr = storage[head];
     return ptr;
   }
 };

@@ -10,7 +10,6 @@
 class BasicEventLoop : public EventLoopInterface {
 private:
   QueueInterface<std::coroutine_handle<>> *general_queue;
-  bool running;
   uint64_t max_ops;
 
 public:

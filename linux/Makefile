@@ -1,10 +1,11 @@
 PROJECT_NAME = COMTEK4
 CPP = g++
+CONFIG_PROJECT_ID ?=0
 
 LOCAL_INC_DIR= include
 GENERAL_INC_DIR= ../common/include
 
-CPP_FLAGS = -std=c++23 -Wall -g -I$(LOCAL_INC_DIR) -I$(GENERAL_INC_DIR) -luring -fcoroutines
+CPP_FLAGS = -std=c++23 -Wall -fsanitize=address -g -I$(LOCAL_INC_DIR) -I$(GENERAL_INC_DIR) -luring -fcoroutines -DCONFIG_PROJECT_ID=\"${CONFIG_PROJECT_ID}\"
 
 SRC_DIR = src
 GENERAL_SRC_DIR = ../common/src

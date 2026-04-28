@@ -1,0 +1,26 @@
+menu "Custom Configuration"
+
+	config LOOP_RUN_MS
+		int "Program Loop run time"
+		default 0
+		help
+			Loop runtime in ms, 0 is infinite
+
+	config UART0_BAUDRATE 
+		int "UART0 baudrate"
+		default 0
+		help
+			Baudrate for UART0
+
+	config ESP_WIFI_SSID
+		string "ESP WIFI SSID"
+		default "myssid"
+		help
+			SSID of WIFI AP ESP connects to
+
+	config ESP_WIFI_PASSWORD
+		string "ESP WIFI PASSWORD"
+		default "mypassword"
+		help
+			PASSWORD of WIFI AP ESP CONNECTS TO
+endmenu

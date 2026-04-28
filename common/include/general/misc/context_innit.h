@@ -14,7 +14,9 @@
 #include "general/interfaces/utility/metrics/standard_metrics.h"
 #include "general/misc/context.h"
 #include "general/misc/names.h"
+#include "general/misc/shutdown.h"
 #include <coroutine>
+#include <cstdio>
 
 template <typename Config>
 
@@ -75,15 +77,11 @@ void innit_buffer_allocator(ProgramContext *ctxt,
 template <typename Config>
 void innit_metrics(ProgramContext *ctxt, Config ctx_config,
                    AllocatorInterface *allocator) {
-  switch (ctx_config.metric_type) {
-  case CtxtMetricType::STANDARD_METRIC: {
-    StandardMetrics *metric_ptr =
-        (StandardMetrics *)allocator->allocate(sizeof(StandardMetrics)).value();
-    new (metric_ptr) StandardMetrics();
-    ctxt->metrics = metric_ptr;
-    return;
-  }
-  }
+  StandardMetrics *metric_ptr =
+      (StandardMetrics *)allocator->allocate(sizeof(StandardMetrics)).value();
+  new (metric_ptr) StandardMetrics();
+  ctxt->metrics = metric_ptr;
+  return;
 }
 template <typename Config>
 void innit_random(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
@@ -100,7 +98,7 @@ void innit_random(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
     auto random_ptr =
         (SeededRandom *)allocator->allocate(sizeof(SeededRandom)).value();
     new (random_ptr) SeededRandom(ctx_config.settings.random_seed);
-    program_ctxt->random = random_ptr;
+    ctxt->random = random_ptr;
     return;
   }
   }
@@ -128,25 +126,36 @@ void innit_names(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
   lookup_ptr->set_name(NAME_IO_FILE_WRITE, "io_file_write");
   lookup_ptr->set_name(NAME_IO_FILE_READ, "io_file_read");
   lookup_ptr->set_name(NAME_IO_FILE_OPEN, "io_file_open");
+  lookup_ptr->set_name(NAME_IO_SERIAL_CLOSE, "io_serial_close");
+  lookup_ptr->set_name(NAME_IO_SERIAL_WRITE, "io_serial_write");
+  lookup_ptr->set_name(NAME_IO_SERIAL_READ, "io_serial_read");
+  lookup_ptr->set_name(NAME_IO_SERIAL_OPEN, "io_serial_open");
 
-  program_ctxt->name_lookup = lookup_ptr;
+  lookup_ptr->set_name(NAME_IO_WIFI_UDP_RECV, "io_wifi_udp_recv");
+  lookup_ptr->set_name(NAME_IO_WIFI_UDP_SEND, "io_wifi_udp_send");
+  lookup_ptr->set_name(NAME_IO_WIFI_UDP_BIND, "io_wifi_udp_bind");
+  lookup_ptr->set_name(NAME_IO_WIFI_UDP_CLOSE, "io_wifi_udp_close");
+
+  ctxt->name_lookup = lookup_ptr;
 }
 template <typename Config>
 void innit_clock(ProgramContext *ctxt, Config ctx_config,
                  AllocatorInterface *allocator) {
-
   switch (ctx_config.clock_type) {
   case CtxtClockType::SIM_CLOCK: {
-    safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM, .error = 1});
-    return;
+    fprintf(stderr, "Sim clock not implemented\n");
+    safe_shutdown(ErrorWrapper{.error = 1, .tag = ErrorWrapper::CUSTOM});
   }
   case CtxtClockType::WALL: {
     auto wall_clock_ptr =
         (WallClock *)allocator->allocate(sizeof(WallClock)).value();
     new (wall_clock_ptr) WallClock(CLOCK_MONOTONIC);
-
     ctxt->clock = wall_clock_ptr;
     return;
+  }
+  default: {
+    fprintf(stderr, "No clock given\n");
+    safe_shutdown(ErrorWrapper{.error = 1, .tag = ErrorWrapper::CUSTOM});
   }
   }
 }
@@ -179,8 +188,7 @@ void innit_io(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
 
 template <typename Config>
 void innit_ctx(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
-               AllocatorInterface *allocator, const char *tag) {
-  program_ctxt = ctxt;
+               AllocatorInterface *allocator) {
   DummyLogger dummy_logger;
   DummyClock dummy_clock;
   ctxt->clock = &dummy_clock;
@@ -210,19 +218,23 @@ void innit_ctx(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
   innit_random(ctxt, ctx_config, allocator);
   uint64_t actual_random_size = allocator->amount_allocated - before;
   before += actual_random_size;
+
   innit_frame_allocator(ctxt, ctx_config, allocator);
   uint64_t actual_frame_alloc_size = allocator->amount_allocated - before;
   before += actual_frame_alloc_size;
+
   innit_io(ctxt, ctx_config, allocator);
   uint64_t actual_io_size = allocator->amount_allocated - before;
   before += actual_io_size;
+
   innit_event_loop(ctxt, ctx_config, allocator);
   uint64_t actual_loop_size = allocator->amount_allocated - before;
   before += actual_loop_size;
+
   innit_deadline_tracker(ctxt, ctx_config, allocator);
   uint64_t actual_deadline_size = allocator->amount_allocated - before;
   before += actual_deadline_size;
-  program_ctxt->logger->submit();
+  context_initialized = true;
 }
 
 #endif

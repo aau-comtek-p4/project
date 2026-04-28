@@ -33,7 +33,7 @@ struct SkipAwaiter {
         sleeper.handle.promise().ctxt.parent_ctxt->trace.id;
     auto res = spawn_future(std::move(sleeper), this->sleep_time_ms);
     if (!res.has_value()) {
-      safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM, .error = 1});
+      safe_shutdown(ErrorWrapper{.error = 1, .tag = ErrorWrapper::CUSTOM});
     }
   }
   void await_resume() {};

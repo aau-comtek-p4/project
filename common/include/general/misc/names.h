@@ -5,7 +5,7 @@
 #include <cstring>
 
 #define NAME_LEN 20
-#define NAME_AMOUNT 30
+#define NAME_AMOUNT 64
 
 #define NAME_NO 0
 #define NAME_PROGRAM_ALLOCATOR 1
@@ -19,11 +19,24 @@
 #define NAME_TIMEOUT_ROUTINE 9
 #define NAME_SLEEP_ROUTINE 10
 #define NAME_CTRLC_ROUTINE 11
+
 #define NAME_IO_FILE_WRITE 12
 #define NAME_IO_FILE_READ 13
 #define NAME_IO_FILE_OPEN 14
 #define NAME_IO_FILE_CLOSE 15
-#define NAME_END 16
+
+#define NAME_IO_SERIAL_WRITE 16
+#define NAME_IO_SERIAL_READ 17
+#define NAME_IO_SERIAL_OPEN 18
+#define NAME_IO_SERIAL_CLOSE 19
+
+#define NAME_IO_WIFI_UDP_RECV 20
+#define NAME_IO_WIFI_UDP_SEND 21
+#define NAME_IO_WIFI_UDP_BIND 22
+#define NAME_IO_WIFI_UDP_CLOSE 23
+
+#define NAME_END 24
+
 class NameLookupInterface {
 public:
   virtual void set_name(uint64_t name_index, const char *name) = 0;

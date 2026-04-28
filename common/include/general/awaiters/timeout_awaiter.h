@@ -60,14 +60,14 @@ template <typename T> struct TimeoutAwaiter {
       return_type res = this->routine_handler.promise().result;
       return res;
     }
-    program_ctxt->metrics->document_metric(MetricType::SURPASSED_DEADLINE);
+    program_ctxt->metrics->document_metric(MetricType::COROUTINE_TIMEOUT);
     this->routine_handler.promise().ctxt.cancelled = true;
     program_ctxt->logger->log_entry(logging::log_coroutine_timeout(
         this->routine_handler.promise().ctxt.name_id,
         this->routine_handler.promise().ctxt.parent_ctxt->name_id,
         this->routine_handler.promise().ctxt.trace.id));
-    return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
-                                        .error = TimeoutError::TIMEOUT});
+    return std::unexpected(ErrorWrapper{.error = TimeoutError::TIMEOUT,
+                                        .tag = ErrorWrapper::CUSTOM});
   }
 };
 template <typename T>

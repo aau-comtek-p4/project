@@ -4,6 +4,7 @@
 #include "general/interfaces/utility/logger.h"
 #include "general/misc/context.h"
 #include "general/misc/errors.h"
+#include "general/misc/shutdown.h"
 #include <cassert>
 #include <cinttypes>
 #include <cstddef>
@@ -21,13 +22,12 @@ ArenaAllocator::ArenaAllocator(uint64_t name_index, uint8_t *buffer,
 std::expected<void *, ErrorWrapper> ArenaAllocator::allocate(uint64_t n) {
   if (this->amount_allocated + n >= this->total_memory) {
     return std::unexpected(
-        ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
-                     .error = CapacityError::INSUFFICIENT_SPACE});
+        ErrorWrapper{.error = CapacityError::INSUFFICIENT_SPACE,
+                     .tag = ErrorWrapper::CUSTOM});
   }
   void *current_ptr = this->buffer + this->amount_allocated;
   this->amount_allocated += n;
   if (ALLOCATOR_LOGGING) {
-
     program_ctxt->logger->log_entry(logging::log_allocator_allocation(
         this->name_index, n, this->total_memory - this->amount_allocated));
   }

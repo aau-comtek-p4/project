@@ -14,6 +14,7 @@ enum CtxtLoggerType {
   FWRITE_LOGGER,
   DUMMY_LOGGER,
   ESP_LOGGER,
+  ESP_QUEUE_LOGGER,
 };
 enum CtxtLoggerSerializer {
   JSON_SERIALIZER,
@@ -21,7 +22,6 @@ enum CtxtLoggerSerializer {
 enum CtxtDeadlineTrackerType {
   MIN_HEAP,
 };
-enum CtxtMetricType { STANDARD_METRIC };
 enum CtxtRandomType { SEEDED, NONE };
 enum ContextType {
   NODE,
@@ -49,7 +49,6 @@ template <typename Setting> struct ContextConfig {
   CtxtLoggerSerializer log_serializer_type;
   CtxtDeadlineTrackerType deadline_tracker_type;
   CtxtRandomType random_type;
-  CtxtMetricType metric_type;
   Setting settings;
 };
 

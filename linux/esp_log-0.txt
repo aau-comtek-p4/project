@@ -1,0 +1,20 @@
+{"ts":86855000,"count":0,"serverity":"debug","reason":"debug","payload":{"msg":"ESP WIFI STA started"}}
+{"ts":2626314000,"count":1,"serverity":"debug","reason":"debug","payload":{"msg":"Retrying WIFI Connect"}}
+{"ts":5139051000,"count":2,"serverity":"debug","reason":"debug","payload":{"msg":"Retrying WIFI Connect"}}
+{"ts":17836640000,"count":3,"serverity":"debug","reason":"debug","payload":{"msg":"WIFI connected"}}
+{"ts":17836900000,"count":4,"serverity":"debug","reason":"debug","payload":{"msg":"Free memory: 52748"}}
+{"ts":17837931000,"count":5,"serverity":"debug","reason":"debug","payload":{"msg":"Stack: 58048"}}
+{"ts":17838847000,"count":6,"serverity":"info","reason":"metric","payload":{"metric":"coroutines_created","count":2}}
+{"ts":17838862000,"count":7,"serverity":"info","reason":"metric","payload":{"metric":"coroutiness_freed","count":0}}
+{"ts":17838872000,"count":8,"serverity":"info","reason":"metric","payload":{"metric":"coroutine_timeouts","count":0}}
+{"ts":17838887000,"count":9,"serverity":"info","reason":"stat_metric","payload":{"stat_type":"dropped_log","count":0,"avg":0,"worst":0}}
+{"ts":17838894000,"count":10,"serverity":"info","reason":"stat_metric","payload":{"stat_type":"suspend_time","count":0,"avg":0,"worst":0}}
+{"ts":17838901000,"count":11,"serverity":"info","reason":"stat_metric","payload":{"stat_type":"loop_time","count":0,"avg":0,"worst":0}}
+{"ts":17838908000,"count":12,"serverity":"info","reason":"stat_metric","payload":{"stat_type":"log_time","count":1,"avg":487000,"worst":487000}}
+{"ts":17838919000,"count":13,"serverity":"info","reason":"stat_metric","payload":{"stat_type":"loop_op_time","count":0,"avg":0,"worst":0}}
+{"ts":17838927000,"count":14,"serverity":"info","reason":"stat_metric","payload":{"stat_type":"deadline_diff","count":0,"avg":0,"worst":0}}
+{"ts":17838934000,"count":15,"serverity":"info","reason":"stat_metric","payload":{"stat_type":"surpasssed_deadline","count":0,"avg":0,"worst":0}}
+{"ts":17838941000,"count":16,"serverity":"info","reason":"stat_metric","payload":{"stat_type":"loop_op_amount","count":0,"avg":0,"worst":0}}
+{"ts":17838952000,"count":17,"serverity":"info","reason":"stat_metric","payload":{"stat_type":"log_amount","count":1,"avg":6,"worst":6}}
+{"ts":17838959000,"count":18,"serverity":"info","reason":"stat_metric","payload":{"stat_type":"log_time_single","count":6,"avg":78500,"worst":231000}}
+{"ts":17838974000,"count":19,"serverity":"debug","reason":"debug","payload":{"msg":"STOP"}}

@@ -7,7 +7,7 @@
 class BlockingFileWriteIOTransport : public StorageIOTransport {
 private:
 public:
-  BlockingFileWriteIOTransport(uint64_t queue_depth);
+  BlockingFileWriteIOTransport();
   void cancel(const void *user_data) override;
   void submit() override;
   void process(uint64_t timeout) override;

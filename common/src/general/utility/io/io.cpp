@@ -53,15 +53,14 @@ std::expected<int, ErrorWrapper> process_io_res(CoRoutineCtxt *ctxt,
   if (ctxt->cancelled) {
     program_ctxt->logger->log_entry(logging::log_io_timeout(
         io_method, io_type, ctxt->name_id, parent_index, ctxt->trace.id));
-    return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
-                                        .error = CustomErrors::TIMEOUT});
+    return std::unexpected(ErrorWrapper{.error = CustomErrors::TIMEOUT,
+                                        .tag = ErrorWrapper::CUSTOM});
   }
-
   if (res < 0) {
     program_ctxt->logger->log_entry(logging::log_io_error(
         io_method, io_type, ctxt->name_id, parent_index, ctxt->trace.id, res));
     return std::unexpected(
-        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = errno});
+        ErrorWrapper{.error = errno, .tag = ErrorWrapper::ERRNO});
   }
   if (IO_LOGGING) {
     program_ctxt->logger->log_entry(logging::log_io_complete(

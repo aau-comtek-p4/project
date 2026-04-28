@@ -14,7 +14,17 @@
 
 #define IO_TAG "IO"
 #define IO_ERROR_TAG "IO ERROR"
-#define IO_LOGGING 0
+#define IO_LOGGING 1
+#define UART_MAGIC_HEADER 0xDEADBEEF
+#define UART_BAUDRATE 921600
+#define CRC32_START 0xFFFFFFFF
+struct UARTLogFrame {
+  uint32_t magic;
+  uint32_t pad1;
+  LogEntry entry;
+  uint32_t pad2;
+  uint32_t check;
+};
 
 class IOAwaitInterface {
 public:
@@ -53,7 +63,7 @@ public:
   IOTransport *register_transport(IOMethod io_method, uint64_t transport_size);
   template <typename T> T *get_transport(IOMethod io_method);
   void submit_all();
-  void process_all(uint64_t timeout);
+  virtual void process_all(uint64_t timeout);
   void cancel(IOMethod io_method, const void *user_data);
 };
 

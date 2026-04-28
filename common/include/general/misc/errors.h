@@ -1,6 +1,7 @@
 #ifndef GENERAL_ERRORS_H
 #define GENERAL_ERRORS_H
 
+#include <cstdint>
 class ConnectionError {
 public:
   enum {
@@ -165,8 +166,8 @@ class CustomErrors : public ConnectionError,
                      public ClockError {};
 
 struct ErrorWrapper {
-  enum { CUSTOM, ERRNO } tag;
-  int error;
+  int32_t error;
+  enum : uint8_t { CUSTOM, ERRNO } tag;
 };
 
 const char *custom_strerror(ErrorWrapper err);

@@ -13,12 +13,12 @@
 #define LOGGER_ERROR_TAG "LOGGER ERROR"
 
 #define MAX_LOG_SIZE 256
-enum CoRoutineType {
+enum CoRoutineType : uint8_t {
   ROUTINE_JOB,
   ROUTINE_TASK,
 };
 
-enum IOType {
+enum IOType : uint8_t {
   READ,
   WRITE,
   OPEN,
@@ -28,7 +28,9 @@ enum IOType {
   SEND,
   CONNECT,
 };
-enum IOMethod {
+// File must be final before end
+// esp uses file for max size as it has no file io
+enum IOMethod : uint8_t {
   IO_WIFI_TCP = 0,
   IO_WIFI_UDP = 1,
   IO_ESP_NOW = 2,
@@ -37,14 +39,14 @@ enum IOMethod {
   IO_FILE = 5,
   IO_END = 6,
 };
-enum LogLevel {
+enum LogLevel : uint8_t {
   LOG_INFO,
   LOG_DEBUG,
   LOG_ERROR,
   LOG_WARNING,
 };
 
-enum LogReason {
+enum LogReason : uint8_t {
   // Coroutine
   REASON_COROUTINE_STARTED,
   REASON_COROUTINE_FINISHED,
@@ -72,6 +74,7 @@ enum LogReason {
   // Logs dropped
   REASON_DROPPED_LOGS,
   //
+  LOG_METRIC,
   LOG_STAT_METRIC,
 };
 class Trace;
@@ -122,35 +125,35 @@ union LogPayload {
     uint64_t amount_left;
   } allocator_freed;
   struct {
-    IOMethod method;
-    IOType type;
     uint64_t name_index;
     uint64_t trace_index;
     uint64_t parent_name_index;
+    IOMethod method;
+    IOType type;
   } io_timeout;
   struct {
-    IOMethod method;
-    IOType type;
     uint64_t name_index;
     uint64_t trace_index;
     uint64_t parent_name_index;
-    int result;
+    int32_t result;
+    IOMethod method;
+    IOType type;
   } io_completed;
 
   struct {
-    IOMethod method;
-    IOType type;
     uint64_t name_index;
     uint64_t trace_index;
     uint64_t parent_name_index;
-    int error_no;
+    int32_t error_no;
+    IOMethod method;
+    IOType type;
   } io_error;
   struct {
     uint64_t absolute_deadline_ms;
   } new_deadline;
 
   struct {
-    char debug[48];
+    char debug[40];
   } debug;
   struct {
     ErrorWrapper error_wrapper;
@@ -166,17 +169,23 @@ union LogPayload {
     uint64_t dropped_amount;
   } logs_dropped;
   struct {
+    StatMetric stat_metric = {};
     StatMetricType metric_type;
-    uint64_t avg_time;
-    uint64_t worst_case;
   } log_stat_metric;
+  struct {
+    uint64_t count;
+    MetricType metric_type;
+  } log_metric;
+  LogPayload() {};
+  ~LogPayload() {};
 };
 
 struct LogEntry {
-  LogReason reason;
-  LogLevel severity;
-  uint64_t timestamp;
   LogPayload payload;
+  uint64_t timestamp;
+  uint64_t log_count;
+  LogLevel severity;
+  LogReason reason;
 };
 LogLevel get_severity(LogReason reason);
 
@@ -221,7 +230,7 @@ LogEntry log_io_error(IOMethod io_method, IOType io_type, uint64_t name_index,
 
 LogEntry log_new_deadline(uint64_t absolute_deadline_ms);
 
-LogEntry log_debug(const char *debug_str);
+__attribute__((format(printf, 1, 2))) LogEntry log_debug(const char *fmt, ...);
 
 LogEntry log_shutdown(ErrorWrapper error_wrapper);
 
@@ -229,8 +238,8 @@ LogEntry log_trace_print(uint64_t name_id, uint64_t trace_id,
                          uint64_t parent_id, uint64_t duration_ns,
                          uint64_t actual_duration_ns);
 LogEntry log_dropped_logs(uint64_t dropped_amount);
-LogEntry log_stat_metric(StatMetricType metric_type, uint64_t average_time,
-                         uint64_t worst_case);
+LogEntry log_stat_metric(StatMetricType metric_type, StatMetric stat_metric);
+LogEntry log_metric(MetricType metric_type, uint64_t count);
 }; // namespace logging
 
 const char *parse_io_type(IOType type);
@@ -247,6 +256,7 @@ public:
 
 class LoggerInterface {
 public:
+  LogSerializerInterface *serializer;
   virtual void log_entry(LogEntry log_entry) noexcept = 0;
 
   virtual void submit(uint64_t timeout) noexcept = 0;
@@ -255,5 +265,7 @@ public:
 const char *parse_log_level(LogLevel log_level);
 
 const char *parse_reason(LogReason reason);
+
+inline uint64_t log_count = 0;
 
 #endif

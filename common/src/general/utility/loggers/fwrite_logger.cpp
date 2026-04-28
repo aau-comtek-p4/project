@@ -11,8 +11,9 @@
 #include <cstring>
 #include <ctime>
 
-FWriteLogger::FWriteLogger(LogSerializerInterface *serializer)
-    : serializer(serializer) {}
+FWriteLogger::FWriteLogger(LogSerializerInterface *serializer) {
+  this->serializer = serializer;
+}
 void FWriteLogger::log_entry(LogEntry log_entry) noexcept {
   uint64_t bytes_written =
       this->serializer->serialize(this->log_buf, MAX_LOG_SIZE, log_entry);

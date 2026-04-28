@@ -1,2 +1,3 @@
+#include "general/interfaces/utility/logger.h"
 #include <cstdio>
-int main() { fprintf(stderr, "This is simulator\n"); }
+int main() { printf("payload: %lu\n", sizeof(LogEntry)); }

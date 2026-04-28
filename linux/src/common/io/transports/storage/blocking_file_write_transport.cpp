@@ -22,8 +22,7 @@
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <unistd.h>
-BlockingFileWriteIOTransport::BlockingFileWriteIOTransport(
-    uint64_t queue_depth) {}
+BlockingFileWriteIOTransport::BlockingFileWriteIOTransport() {}
 
 void BlockingFileWriteIOTransport::submit() {}
 void BlockingFileWriteIOTransport::process(uint64_t timeout) {}

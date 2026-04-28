@@ -50,13 +50,13 @@ template <uint64_t bucket_count, uint64_t bucket_size>
 std::expected<void *, ErrorWrapper>
 BucketAllocator<bucket_count, bucket_size>::allocate(uint64_t n) {
   if (n > bucket_size) {
-    safe_shutdown(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
-                               .error = CapacityError::BUFFER_OVERFLOW});
+    safe_shutdown(ErrorWrapper{.error = CapacityError::BUFFER_OVERFLOW,
+                               .tag = ErrorWrapper::CUSTOM});
   }
   if (this->free_bucket_header_ptr == nullptr) {
     return std::unexpected(
-        ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
-                     .error = CapacityError::INSUFFICIENT_SPACE});
+        ErrorWrapper{.error = CapacityError::INSUFFICIENT_SPACE,
+                     .tag = ErrorWrapper::CUSTOM});
   }
   assert((this->amount_allocated + n) <= this->total_memory);
   this->allocated_buckets_count += 1;
@@ -89,7 +89,7 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
 
   if (this->allocated_buckets_count == 0) {
     return std::unexpected(ErrorWrapper{
-        .tag = ErrorWrapper::CUSTOM, .error = CapacityError::BUFFER_UNDERFLOW});
+        .error = CapacityError::BUFFER_UNDERFLOW, .tag = ErrorWrapper::CUSTOM});
   }
   auto start = reinterpret_cast<std::byte *>(this->buffer);
   auto end = start + bucket_count * sizeof(Bucket<bucket_size>);
@@ -97,8 +97,8 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
   bool ptr_in_range = ptr >= start && ptr < end;
 
   if (!ptr_in_range) {
-    return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
-                                        .error = CapacityError::OUTSIDE_RANGE});
+    return std::unexpected(ErrorWrapper{.error = CapacityError::OUTSIDE_RANGE,
+                                        .tag = ErrorWrapper::CUSTOM});
   }
 
   auto cur_bucket_ptr = reinterpret_cast<Bucket<bucket_size> *>(bucket_ptr);
@@ -106,12 +106,12 @@ BucketAllocator<bucket_count, bucket_size>::free(void *bucket_ptr) {
                      reinterpret_cast<std::byte *>(this->buffer)) %
                     sizeof(Bucket<bucket_size>);
   if (offset != 0) {
-    return std::unexpected(ErrorWrapper{.tag = ErrorWrapper::CUSTOM,
-                                        .error = CapacityError::OUTSIDE_RANGE});
+    return std::unexpected(ErrorWrapper{.error = CapacityError::OUTSIDE_RANGE,
+                                        .tag = ErrorWrapper::CUSTOM});
   }
   if (cur_bucket_ptr->allocation_size == 0) {
     return std::unexpected(ErrorWrapper{
-        .tag = ErrorWrapper::CUSTOM, .error = CapacityError::BUFFER_UNDERFLOW});
+        .error = CapacityError::BUFFER_UNDERFLOW, .tag = ErrorWrapper::CUSTOM});
   }
   uint64_t used_memory = cur_bucket_ptr->allocation_size;
   cur_bucket_ptr->next_ptr = this->free_bucket_header_ptr;

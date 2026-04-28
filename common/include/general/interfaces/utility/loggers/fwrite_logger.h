@@ -11,7 +11,6 @@
 class FWriteLogger : public LoggerInterface {
 private:
   char log_buf[MAX_LOG_SIZE] = {0};
-  LogSerializerInterface *serializer;
 
 public:
   FWriteLogger(LogSerializerInterface *serializer);

@@ -11,6 +11,7 @@
 #define EVENT_LOOP_ERR_TAG "EVENT LOOP ERR"
 class EventLoopInterface {
 public:
+  bool running;
   virtual std::expected<void, ErrorWrapper>
   enque(std::coroutine_handle<> handle) = 0;
 

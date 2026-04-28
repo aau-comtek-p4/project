@@ -81,7 +81,7 @@ struct Job::promise_type : public shared_promise_type {
 
   void unhandled_exception() {
     ErrorWrapper error =
-        ErrorWrapper{.tag = ErrorWrapper::ERRNO, .error = errno};
+        ErrorWrapper{.error = errno, .tag = ErrorWrapper::ERRNO};
     safe_shutdown(error);
   }
 

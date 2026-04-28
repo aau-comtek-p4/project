@@ -2,12 +2,15 @@
 #include "general/common.h"
 #include "general/interfaces/utility/clock.h"
 #include "general/interfaces/utility/metrics.h"
+#include "general/interfaces/utility/metrics/standard_metrics.h"
 #include "general/misc/context.h"
 #include "general/misc/errors.h"
 #include <cinttypes>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <format>
 const char *parse_io_type(IOType type) {
   switch (type) {
   case IOType::OPEN:
@@ -72,6 +75,7 @@ LogLevel get_severity(LogReason reason) {
   case LogReason::REASON_NEW_DEADLINE:
   case LogReason::REASON_TRACE_PRINT:
   case LogReason::LOG_STAT_METRIC:
+  case LogReason::LOG_METRIC:
     return LogLevel::LOG_INFO;
 
     // WARNING
@@ -92,13 +96,19 @@ LogLevel get_severity(LogReason reason) {
   // DEBUG
   return LogLevel::LOG_DEBUG;
 }
+LogEntry initialize_log_header(LogReason reason) {
+  LogEntry entry = {};
+  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
+  entry.reason = reason;
+  entry.severity = get_severity(entry.reason);
+  entry.log_count = log_count;
+  log_count += 1;
+  return entry;
+}
 
 LogEntry logging::log_coroutine_start(uint64_t name_index,
                                       uint64_t parent_name_index) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_COROUTINE_STARTED;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_COROUTINE_STARTED);
   entry.payload.coroutine_started.name_index = name_index;
   entry.payload.coroutine_started.parent_name_index = parent_name_index;
   return entry;
@@ -107,10 +117,8 @@ LogEntry logging::log_coroutine_finished(uint64_t name_index,
                                          uint64_t parent_name_index,
                                          uint64_t actual_time_elapsed_ns,
                                          uint64_t trace_index) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_COROUTINE_FINISHED;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_COROUTINE_FINISHED);
+
   entry.payload.coroutine_finished.name_index = name_index;
   entry.payload.coroutine_finished.actual_time_ns = actual_time_elapsed_ns;
   entry.payload.coroutine_finished.trace_index = trace_index;
@@ -120,10 +128,7 @@ LogEntry logging::log_coroutine_finished(uint64_t name_index,
 LogEntry logging::log_coroutine_timeout(uint64_t name_index,
                                         uint64_t parent_name_index,
                                         uint64_t trace_index) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_COROUTINE_TIMEOUT;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_COROUTINE_TIMEOUT);
 
   entry.payload.coroutine_timeout.name_index = name_index;
   entry.payload.coroutine_timeout.parent_name_index = parent_name_index;
@@ -132,10 +137,7 @@ LogEntry logging::log_coroutine_timeout(uint64_t name_index,
 }
 LogEntry logging::log_coroutine_suspended(uint64_t name_index,
                                           uint64_t actual_time_elapsed) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_COROUTINE_SUSPENDED;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_COROUTINE_SUSPENDED);
 
   entry.payload.coroutine_suspended.name_index = name_index;
   entry.payload.coroutine_suspended.actual_time_ns = actual_time_elapsed;
@@ -145,10 +147,7 @@ LogEntry logging::log_coroutine_suspended(uint64_t name_index,
 LogEntry logging::log_queue_threshold(uint64_t name_index,
                                       uint64_t amount_allocated,
                                       uint64_t amount_left) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_QUEUE_THRESHOLD;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_QUEUE_THRESHOLD);
 
   entry.payload.queue_treshold.amount_allocated = amount_allocated;
   entry.payload.queue_treshold.amount_left = amount_left;
@@ -160,10 +159,8 @@ LogEntry logging::log_bucket_allocator_allocation(uint64_t name_index,
                                                   uint64_t amount_allocated,
                                                   uint64_t amount_left,
                                                   uint64_t bucket_size) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_BUCKET_ALLOCATOR_ALLOCATION;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry =
+      initialize_log_header(LogReason::REASON_BUCKET_ALLOCATOR_ALLOCATION);
 
   entry.payload.bucket_allocator_allocation.amount_allocated = amount_allocated;
   entry.payload.bucket_allocator_allocation.amount_left = amount_left;
@@ -175,10 +172,8 @@ LogEntry logging::log_bucket_allocator_allocation(uint64_t name_index,
 LogEntry logging::log_allocator_allocation(uint64_t name_index,
                                            uint64_t amount_allocated,
                                            uint64_t amount_left) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_ALLOCATOR_ALLOCATION;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry =
+      initialize_log_header(LogReason::REASON_ALLOCATOR_ALLOCATION);
 
   entry.payload.allocator_allocation.amount_allocated = amount_allocated;
   entry.payload.allocator_allocation.amount_left = amount_left;
@@ -188,10 +183,7 @@ LogEntry logging::log_allocator_allocation(uint64_t name_index,
 LogEntry logging::log_allocator_threshold_reached(uint64_t name_index,
                                                   uint64_t amount_allocated,
                                                   uint64_t amount_left) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_ALLOCATOR_TRHESHOLD;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_ALLOCATOR_TRHESHOLD);
 
   entry.payload.allocator_threshold.amount_left = amount_left;
   entry.payload.allocator_threshold.amount_allocated = amount_allocated;
@@ -201,10 +193,7 @@ LogEntry logging::log_allocator_threshold_reached(uint64_t name_index,
 LogEntry logging::log_allocator_free(uint64_t name_index, uint64_t amount_freed,
                                      uint64_t amount_left) {
 
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_ALLOCATOR_FREE;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_ALLOCATOR_FREE);
 
   entry.payload.allocator_freed.amount_left = amount_left;
   entry.payload.allocator_freed.amount_freed = amount_freed;
@@ -216,10 +205,7 @@ LogEntry logging::log_io_timeout(IOMethod io_method, IOType io_type,
                                  uint64_t name_index,
                                  uint64_t parent_name_index,
                                  uint64_t trace_index) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_IO_TIMEOUT;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_IO_TIMEOUT);
 
   entry.payload.io_timeout.method = io_method;
   entry.payload.io_timeout.type = io_type;
@@ -233,10 +219,7 @@ LogEntry logging::log_io_complete(IOMethod io_method, IOType io_type,
                                   uint64_t name_index,
                                   uint64_t parent_name_index,
                                   uint64_t trace_index, uint64_t io_result) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_IO_COMPLETED;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_IO_COMPLETED);
 
   entry.payload.io_completed.parent_name_index = parent_name_index;
   entry.payload.io_completed.method = io_method;
@@ -250,10 +233,7 @@ LogEntry logging::log_io_complete(IOMethod io_method, IOType io_type,
 LogEntry logging::log_io_error(IOMethod io_method, IOType io_type,
                                uint64_t name_index, uint64_t parent_name_index,
                                uint64_t trace_index, uint64_t err_no) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_IO_COMPLETED;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_IO_COMPLETED);
 
   entry.payload.io_error.parent_name_index = parent_name_index;
   entry.payload.io_error.method = io_method;
@@ -265,32 +245,26 @@ LogEntry logging::log_io_error(IOMethod io_method, IOType io_type,
 }
 
 LogEntry logging::log_new_deadline(uint64_t absolute_deadline_ms) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_NEW_DEADLINE;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_NEW_DEADLINE);
 
   entry.payload.new_deadline.absolute_deadline_ms = absolute_deadline_ms;
   return entry;
 }
-LogEntry logging::log_debug(const char *debug_str) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_DEBUG;
-  entry.severity = get_severity(entry.reason);
 
-  uint64_t str_len = strlen(debug_str);
+__attribute__((format(printf, 1, 2))) LogEntry
+logging::log_debug(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  LogEntry entry = initialize_log_header(LogReason::REASON_DEBUG);
+  vsnprintf(entry.payload.debug.debug, sizeof(entry.payload.debug.debug), fmt,
+            args);
+  va_end(args);
 
-  strncpy(entry.payload.debug.debug, debug_str, str_len);
-  entry.payload.debug.debug[str_len] = 0;
   return entry;
 }
 
 LogEntry logging::log_shutdown(ErrorWrapper error_wrapper) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_SHUTDOWN;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_SHUTDOWN);
 
   entry.payload.shutdown.error_wrapper = error_wrapper;
   return entry;
@@ -299,10 +273,7 @@ LogEntry logging::log_shutdown(ErrorWrapper error_wrapper) {
 LogEntry logging::log_trace_print(uint64_t name_id, uint64_t trace_id,
                                   uint64_t parent_id, uint64_t duration_ns,
                                   uint64_t actual_duration_ns) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_TRACE_PRINT;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_TRACE_PRINT);
 
   entry.payload.trace_print.name_id = name_id;
   entry.payload.trace_print.trace_id = trace_id;
@@ -312,25 +283,27 @@ LogEntry logging::log_trace_print(uint64_t name_id, uint64_t trace_id,
   return entry;
 }
 LogEntry logging::log_dropped_logs(uint64_t dropped_amount) {
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::REASON_DROPPED_LOGS;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::REASON_DROPPED_LOGS);
 
   entry.payload.logs_dropped.dropped_amount = dropped_amount;
   return entry;
 }
 LogEntry logging::log_stat_metric(StatMetricType metric_type,
-                                  uint64_t average_time, uint64_t worst_case) {
+                                  StatMetric stat_metric) {
 
-  LogEntry entry;
-  entry.timestamp = program_ctxt->clock->rt_since_start_ns();
-  entry.reason = LogReason::LOG_STAT_METRIC;
-  entry.severity = get_severity(entry.reason);
+  LogEntry entry = initialize_log_header(LogReason::LOG_STAT_METRIC);
 
   entry.payload.log_stat_metric.metric_type = metric_type;
-  entry.payload.log_stat_metric.avg_time = average_time;
-  entry.payload.log_stat_metric.worst_case = worst_case;
+  entry.payload.log_stat_metric.stat_metric = stat_metric;
+  return entry;
+}
+
+LogEntry logging::log_metric(MetricType metric_type, uint64_t count) {
+
+  LogEntry entry = initialize_log_header(LogReason::LOG_METRIC);
+
+  entry.payload.log_metric.metric_type = metric_type;
+  entry.payload.log_metric.count = count;
   return entry;
 }
 const char *parse_log_level(LogLevel log_level) {
@@ -388,14 +361,17 @@ const char *parse_reason(LogReason reason) {
     return "dropped_logs";
   case LogReason::LOG_STAT_METRIC:
     return "stat_metric";
+  case LogReason::LOG_METRIC:
+    return "metric";
   }
   return "io_unkown";
 }
 uint64_t serializer_helper(char *buf, uint64_t max_entry, LogEntry log_entry) {
   return snprintf(buf, max_entry,
-                  "{\"ts\":%" PRIu64
+                  "{\"ts\":%" PRIu64 ",\"count\":%" PRIu64
                   ",\"serverity\":\"%s\",\"reason\":\"%s\",\"payload\":{",
-                  log_entry.timestamp, parse_log_level(log_entry.severity),
+                  log_entry.timestamp, log_entry.log_count,
+                  parse_log_level(log_entry.severity),
                   parse_reason(log_entry.reason));
 }
 uint64_t JsonLogSerializer::serialize(char *buf, uint64_t max_entry,
@@ -407,7 +383,7 @@ uint64_t JsonLogSerializer::serialize(char *buf, uint64_t max_entry,
     return snprintf(buf + header_size, max_entry - header_size,
                     "\"type\":\"%s\",\"method\":\"%s\",\"name\":\"%s\","
                     "\"caller\":\"%s\","
-                    "\"trace\":%" PRIu64 ",\"res\":%i }}\n",
+                    "\"trace\":%" PRIu64 ",\"res\":%" PRIi32 " }}\n",
                     parse_io_type(log_entry.payload.io_completed.type),
                     parse_io_method(log_entry.payload.io_completed.method),
                     program_ctxt->name_lookup->get_name(
@@ -434,7 +410,7 @@ uint64_t JsonLogSerializer::serialize(char *buf, uint64_t max_entry,
     return snprintf(buf + header_size, max_entry - header_size,
                     "\"type\":\"%s\",\"method\":\"%s\",\"name\":\"%s\","
                     "\"caller\":\"%s\","
-                    "\"trace\":%" PRIu64 ",\"errono\":%i }}\n",
+                    "\"trace\":%" PRIu64 ",\"errono\":%" PRIi32 " }}\n",
                     parse_io_type(log_entry.payload.io_error.type),
                     parse_io_method(log_entry.payload.io_error.method),
                     program_ctxt->name_lookup->get_name(
@@ -445,7 +421,6 @@ uint64_t JsonLogSerializer::serialize(char *buf, uint64_t max_entry,
                     log_entry.payload.io_error.error_no) +
            header_size;
   case LogReason::REASON_COROUTINE_STARTED:
-
     return snprintf(
                buf + header_size, max_entry - header_size,
                "\"name\":\"%s\",\"parent\":\"%s\"}}\n",
@@ -565,14 +540,25 @@ uint64_t JsonLogSerializer::serialize(char *buf, uint64_t max_entry,
                     log_entry.payload.logs_dropped.dropped_amount) +
            header_size;
 
-  case LogReason::LOG_STAT_METRIC:
+  case LogReason::LOG_STAT_METRIC: {
+    uint64_t avg = log_entry.payload.log_stat_metric.stat_metric.count
+                       ? log_entry.payload.log_stat_metric.stat_metric.total /
+                             log_entry.payload.log_stat_metric.stat_metric.count
+                       : 0;
     return snprintf(buf + header_size, max_entry - header_size,
-                    "\"latency_type\":\"%s\",\"avg\":%" PRIu64
-                    ",\"worst\":%" PRIu64 "}}\n",
-                    parse_latency_metric_type(
+                    "\"stat_type\":\"%s\",\"count\":%" PRIu64
+                    ",\"avg\":%" PRIu64 ",\"worst\":%" PRIu64 "}}\n",
+                    parse_stat_metric_type(
                         log_entry.payload.log_stat_metric.metric_type),
-                    log_entry.payload.log_stat_metric.avg_time,
-                    log_entry.payload.log_stat_metric.worst_case) +
+                    log_entry.payload.log_stat_metric.stat_metric.count, avg,
+                    log_entry.payload.log_stat_metric.stat_metric.worst_case) +
+           header_size;
+  }
+  case LogReason::LOG_METRIC:
+    return snprintf(buf + header_size, max_entry - header_size,
+                    "\"metric\":\"%s\",\"count\":%" PRIu64 "}}\n",
+                    parse_metric_type(log_entry.payload.log_metric.metric_type),
+                    log_entry.payload.log_metric.count) +
            header_size;
   }
   return 0;

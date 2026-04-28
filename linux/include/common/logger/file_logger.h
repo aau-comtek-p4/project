@@ -7,7 +7,8 @@
 #include "general/interfaces/utility/logger.h"
 #include <cstdint>
 #include <cstdio>
-#define LOG_FILE_NAME "log.txt"
+#define MAX_LOG_FILE_NAME_SIZE 30
+#define LOG_FILE_NAME "log-" CONFIG_PROJECT_ID ".txt"
 class FileLogger : public LoggerInterface {
 private:
   QueueInterface<LogEntry> *msg_queue;
