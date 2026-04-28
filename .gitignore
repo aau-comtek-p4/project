@@ -6,5 +6,5 @@ test.*
 *log*
 venv
 compile_commands.json
-managed_components
+*/managed_components/*
 sdkconfig
