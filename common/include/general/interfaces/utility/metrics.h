@@ -21,13 +21,16 @@ enum StatMetricType : uint8_t {
   METRIC_LOOP_OP = 7,
   METRIC_LOG_AMOUNT = 8,
   METRIC_SINGLE_LOG_TIME = 9,
-  LATENCY_METRIC_END = 10,
+  METRIC_IO_PROCESSING = 10,
+  METRIC_IO_SUBMIT = 11,
+  METRIC_COROUTINE_RESUME = 12,
+  METRIC_SEQ_MISSING = 13,
+  LATENCY_METRIC_END = 14,
 };
 struct StatMetric {
   uint64_t total = 0;
   uint64_t count = 0;
   uint64_t worst_case = 0;
-  uint64_t print_interval = 0;
 };
 
 class MetricsInterface {
@@ -38,6 +41,7 @@ public:
                                                  uint64_t latency_ns) = 0;
   virtual uint64_t get_metric(MetricType metric_type) = 0;
   virtual void print_metrics() = 0;
+  virtual void print_total_metrics() = 0;
 };
 
 const char *parse_stat_metric_type(StatMetricType metric_type);

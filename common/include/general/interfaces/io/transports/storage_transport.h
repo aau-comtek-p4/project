@@ -6,12 +6,21 @@
 #include <expected>
 class StorageIOTransport : public IOTransport {
 public:
-  virtual Task<std::expected<int, ErrorWrapper>> io_open(IOAddress addr) = 0;
   virtual Task<std::expected<int, ErrorWrapper>>
-  io_read(IOAddress addr, uint8_t *buf, uint64_t buf_size) = 0;
+  io_open(const IOAddress *addr) = 0;
   virtual Task<std::expected<int, ErrorWrapper>>
-  io_write(IOAddress addr, const uint8_t *buf, uint64_t buf_size) = 0;
-  virtual Task<std::expected<int, ErrorWrapper>> io_close(IOAddress addr) = 0;
+  io_read(const IOAddress *addr, uint8_t *buf, uint64_t buf_size) = 0;
+
+  virtual Task<std::expected<int, ErrorWrapper>>
+  io_write(const IOAddress *addr, const uint8_t *buf, uint64_t buf_size,
+           IOPackageType package_type) = 0;
+
+  virtual Task<std::expected<int, ErrorWrapper>>
+  io_write(const IOAddress *addr, const uint8_t *buf, uint64_t buf_size,
+           IOPackageType package_type, bool with_ack) = 0;
+
+  virtual Task<std::expected<int, ErrorWrapper>>
+  io_close(const IOAddress *addr) = 0;
 };
 
 #endif

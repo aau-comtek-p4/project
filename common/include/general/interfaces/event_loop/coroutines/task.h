@@ -47,9 +47,6 @@ public:
 template <typename T>
 
 bool Task<T>::await_ready() {
-  if (this->handle.done()) {
-  }
-
   return this->handle.done();
 }
 
@@ -113,7 +110,6 @@ struct Task<T>::promise_type : public shared_promise_type {
       CoRoutineCtxt *own_ctxt = &own_handler.promise().ctxt;
       CoRoutineCtxt *parent_ctxt = own_ctxt->parent_ctxt;
       if (parent_ctxt && !own_ctxt->cancelled) {
-        parent_ctxt->trace.add_time(own_ctxt->trace.duration_ns);
         parent_ctxt->trace.add_actual_time(own_ctxt->trace.actual_duration_ns);
         auto res = program_ctxt->loop->enque(parent_ctxt->handle);
         if (!res.has_value()) {

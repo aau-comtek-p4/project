@@ -2,6 +2,7 @@ file(GLOB_RECURSE SRC_FILES
     "src/*.cpp"
     "src/io/*.cpp"
     "src/logging/*.cpp"
+    "src/coroutines/*.cpp"
     "../../common/src/*.cpp"
 )
 idf_component_register(SRCS ${SRC_FILES} 

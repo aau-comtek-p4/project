@@ -42,8 +42,6 @@ template <typename T> struct TimeoutAwaiter {
     this->timeout_handle.promise().ctxt.io_address =
         this->routine_handler.promise().ctxt.io_address;
     this->timeout_handle.promise().ctxt.parent_ctxt = &h.promise().ctxt;
-    this->timeout_handle.promise().ctxt.trace.add_time(this->timeout_ms *
-                                                       NS_PR_MS);
     this->timeout_handle.promise().ctxt.trace.parent_id =
         this->timeout_handle.promise().ctxt.parent_ctxt->trace.id;
     res = spawn_future(std::move(timeouter), this->timeout_ms);

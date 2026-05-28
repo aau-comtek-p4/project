@@ -2,13 +2,13 @@
 #define CO_ROUTINE_INTERFACE_H
 #include "general/common.h"
 #include "general/interfaces/utility/trace.h"
+#include "general/misc/names.h"
 #include <coroutine>
 #include <cstdint>
 #include <cstdio>
 
 #define COROUTINE_TAG "COROUTINE"
 #define COROUTINE_ERR_TAG "COROUTINE ERROR"
-#define COROUTINE_LOGGING 1
 class Coroutine {};
 class IOAwaitInterface;
 
@@ -20,9 +20,9 @@ struct CoRoutineCtxt {
   IOAwaitInterface *io_address = nullptr;
   std::coroutine_handle<> handle;
   uint64_t id;
-  uint64_t name_id;
+  uint8_t name_id;
   Trace trace;
-  void set_name(uint64_t name_id);
+  void set_name(name_type_t name_id);
 };
 
 struct shared_promise_type {
@@ -43,8 +43,7 @@ GetCtxtAwaiter get_ctxt();
 
 struct CoRoutineInterface {
 public:
-  struct promise_type;
-  using handle_type = std::coroutine_handle<promise_type>;
+  using handle_type = std::coroutine_handle<shared_promise_type>;
   handle_type h;
 };
 

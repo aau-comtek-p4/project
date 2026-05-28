@@ -2,11 +2,8 @@
 #include <cstring>
 
 const char *custom_strerror(ErrorWrapper err) {
-  switch (err.tag) {
-  case ErrorWrapper::ERRNO:
+  if (err.tag == ErrorWrapper::ERRNO) {
     return strerror(err.error);
-  case ErrorWrapper::CUSTOM:
-    break;
   }
   switch (err.error) {
   // ConnectionError

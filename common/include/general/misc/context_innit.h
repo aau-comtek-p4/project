@@ -4,6 +4,7 @@
 #include "general/interfaces/event_loop/deadline_keeper.h"
 #include "general/interfaces/event_loop/deadline_storage/min_heap_storage.h"
 #include "general/interfaces/event_loop/event_loops/basic_event_loop.h"
+#include "general/interfaces/io/io.h"
 #include "general/interfaces/simulator/random/null_random.h"
 #include "general/interfaces/simulator/random/seeded_random.h"
 #include "general/interfaces/storage/allocators/bucket_allocator.h"
@@ -29,7 +30,7 @@ void innit_event_loop(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
   auto queue_ptr =
       (queue_type *)allocator->allocate(sizeof(queue_type)).value();
 
-  new (queue_ptr) queue_type(NAME_READY_QUEUE);
+  new (queue_ptr) queue_type();
   auto event_loop_ptr =
       (event_loop_type *)allocator->allocate(sizeof(event_loop_type)).value();
 
@@ -109,7 +110,7 @@ void innit_names(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
   using name_lookup_type = NameLookup<NAME_LEN, NAME_AMOUNT>;
   name_lookup_type *lookup_ptr =
       (name_lookup_type *)allocator->allocate(sizeof(name_lookup_type)).value();
-  new (lookup_ptr) name_lookup_type{};
+  new (lookup_ptr) name_lookup_type;
   lookup_ptr->set_name(NAME_NO, "none");
   lookup_ptr->set_name(NAME_BUFFER_ALLOCATOR, "buffer_allocator");
   lookup_ptr->set_name(NAME_FRAME_ALLOCATOR, "frame_allocator");
@@ -136,6 +137,25 @@ void innit_names(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
   lookup_ptr->set_name(NAME_IO_WIFI_UDP_BIND, "io_wifi_udp_bind");
   lookup_ptr->set_name(NAME_IO_WIFI_UDP_CLOSE, "io_wifi_udp_close");
 
+  lookup_ptr->set_name(NAME_IO_WIFI_TCP_RECV, "io_wifi_tcp_recv");
+  lookup_ptr->set_name(NAME_IO_WIFI_TCP_SEND, "io_wifi_tcp_send");
+  lookup_ptr->set_name(NAME_IO_WIFI_TCP_BIND, "io_wifi_tcp_bind");
+  lookup_ptr->set_name(NAME_IO_WIFI_TCP_CLOSE, "io_wifi_tcp_close");
+  lookup_ptr->set_name(NAME_IO_WIFI_TCP_CONNECT, "io_wifi_tcp_connect");
+  lookup_ptr->set_name(NAME_IO_WIFI_TCP_ACCEPT, "io_wifi_tcp_accept");
+
+  lookup_ptr->set_name(NAME_IO_WIFI_ESPNOW_RECV, "io_wifi_espnow_recv");
+  lookup_ptr->set_name(NAME_IO_WIFI_ESPNOW_SEND, "io_wifi_espnow_send");
+  lookup_ptr->set_name(NAME_IO_WIFI_ESPNOW_BIND, "io_wifi_espnow_bind");
+  lookup_ptr->set_name(NAME_IO_WIFI_ESPNOW_CLOSE, "io_wifi_espnow_close");
+
+  lookup_ptr->set_name(NAME_METRIC_PRINTER, "metric_printer");
+
+  lookup_ptr->set_name(NAME_UART_READER, "uart_reader");
+  lookup_ptr->set_name(NAME_UART_WRITER, "uart_writer");
+
+  lookup_ptr->set_name(NAME_UART_READER_GEN, "uart_reader_gen");
+
   ctxt->name_lookup = lookup_ptr;
 }
 template <typename Config>
@@ -145,6 +165,7 @@ void innit_clock(ProgramContext *ctxt, Config ctx_config,
   case CtxtClockType::SIM_CLOCK: {
     fprintf(stderr, "Sim clock not implemented\n");
     safe_shutdown(ErrorWrapper{.error = 1, .tag = ErrorWrapper::CUSTOM});
+    return;
   }
   case CtxtClockType::WALL: {
     auto wall_clock_ptr =
@@ -156,6 +177,7 @@ void innit_clock(ProgramContext *ctxt, Config ctx_config,
   default: {
     fprintf(stderr, "No clock given\n");
     safe_shutdown(ErrorWrapper{.error = 1, .tag = ErrorWrapper::CUSTOM});
+    return;
   }
   }
 }
@@ -180,6 +202,19 @@ void innit_deadline_tracker(ProgramContext *ctxt,
 }
 
 template <typename Config>
+void innit_io_connection_handler(ProgramContext *ctxt,
+                                 ContextConfig<Config> ctx_config,
+                                 AllocatorInterface *allocator) {
+
+  auto handler_ptr =
+      (IOConnectionHandler *)allocator->allocate(sizeof(IOConnectionHandler))
+          .value();
+  new (handler_ptr) IOConnectionHandler();
+  ctxt->connection_handler = handler_ptr;
+  return;
+}
+
+template <typename Config>
 void innit_logger(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
                   AllocatorInterface *allocator);
 template <typename Config>
@@ -189,6 +224,8 @@ void innit_io(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
 template <typename Config>
 void innit_ctx(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
                AllocatorInterface *allocator) {
+
+  program_ctxt = ctxt;
   DummyLogger dummy_logger;
   DummyClock dummy_clock;
   ctxt->clock = &dummy_clock;
@@ -207,9 +244,10 @@ void innit_ctx(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
   uint64_t actual_clock_size = allocator->amount_allocated - before;
   before += actual_clock_size;
 
-  innit_logger(ctxt, ctx_config, allocator);
-  uint64_t actual_logger_size = allocator->amount_allocated - before;
-  before += actual_logger_size;
+  innit_io_connection_handler(ctxt, ctx_config, allocator);
+  uint64_t actual_io_connection_handler_size =
+      allocator->amount_allocated - before;
+  before += actual_io_connection_handler_size;
 
   innit_buffer_allocator(ctxt, ctx_config, allocator);
   uint64_t actual_buffer_alloc_size = allocator->amount_allocated - before;
@@ -223,6 +261,8 @@ void innit_ctx(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
   uint64_t actual_frame_alloc_size = allocator->amount_allocated - before;
   before += actual_frame_alloc_size;
 
+  printf("Innit frame\n");
+
   innit_io(ctxt, ctx_config, allocator);
   uint64_t actual_io_size = allocator->amount_allocated - before;
   before += actual_io_size;
@@ -234,6 +274,10 @@ void innit_ctx(ProgramContext *ctxt, ContextConfig<Config> ctx_config,
   innit_deadline_tracker(ctxt, ctx_config, allocator);
   uint64_t actual_deadline_size = allocator->amount_allocated - before;
   before += actual_deadline_size;
+
+  innit_logger(ctxt, ctx_config, allocator);
+  uint64_t actual_logger_size = allocator->amount_allocated - before;
+  before += actual_logger_size;
   context_initialized = true;
 }
 

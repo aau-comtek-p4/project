@@ -6,6 +6,7 @@
 #include "general/misc/context.h"
 #include "general/misc/errors.h"
 #include "general/misc/shutdown.h"
+#include <cassert>
 #include <cinttypes>
 #include <cstddef>
 #include <cstdint>
@@ -13,8 +14,8 @@
 #include <filesystem>
 
 template <uint64_t bucket_size> struct Bucket {
-  std::byte buffer[bucket_size] = {0};
-  size_t allocation_size;
+  std::uint8_t buffer[bucket_size] = {0};
+  uint64_t allocation_size;
   Bucket<bucket_size> *next_ptr;
 };
 

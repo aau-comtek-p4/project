@@ -11,10 +11,13 @@ struct StandardMetricHolder {
 };
 class StandardMetrics : public MetricsInterface {
 private:
-  StatMetric stat_metrics[StatMetricType::LATENCY_METRIC_END];
-  StandardMetricHolder metrics_holder;
+  StatMetric temp_stat_metrics[StatMetricType::LATENCY_METRIC_END] = {};
+  StatMetric stat_metrics[StatMetricType::LATENCY_METRIC_END] = {};
+  StandardMetricHolder metrics_holder = {};
+  StandardMetricHolder temp_metrics_holder = {};
   void print_stat_metric(StatMetricType metric_type);
   void print_metric(MetricType metric_type);
+  void reset_metrics();
 
 public:
   StandardMetrics();
@@ -23,6 +26,7 @@ public:
                                          uint64_t latency_ns) override;
   uint64_t get_metric(MetricType metric_type) override;
   void print_metrics() override;
+  void print_total_metrics() override;
 };
 
 #endif

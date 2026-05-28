@@ -2,6 +2,7 @@
 #define NAMES_H
 
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 
 #define NAME_LEN 20
@@ -35,32 +36,64 @@
 #define NAME_IO_WIFI_UDP_BIND 22
 #define NAME_IO_WIFI_UDP_CLOSE 23
 
-#define NAME_END 24
+#define NAME_IO_WIFI_TCP_RECV 24
+#define NAME_IO_WIFI_TCP_SEND 25
+#define NAME_IO_WIFI_TCP_BIND 26
+#define NAME_IO_WIFI_TCP_CLOSE 27
+#define NAME_IO_WIFI_TCP_ACCEPT 28
+#define NAME_IO_WIFI_TCP_CONNECT 29
+
+#define NAME_METRIC_PRINTER 30
+
+#define NAME_UART_READER 31
+#define NAME_UART_WRITER 32
+
+#define NAME_UART_READER_GEN 33
+
+#define NAME_IO_WIFI_ESPNOW_RECV 34
+#define NAME_IO_WIFI_ESPNOW_SEND 35
+#define NAME_IO_WIFI_ESPNOW_BIND 36
+#define NAME_IO_WIFI_ESPNOW_CLOSE 37
+
+#define NAME_END 38
+using name_type_t = uint8_t;
 
 class NameLookupInterface {
 public:
-  virtual void set_name(uint64_t name_index, const char *name) = 0;
-  virtual char *get_name(uint64_t name_index) = 0;
+  virtual void set_name(name_type_t name_index, const char *name) = 0;
+  virtual name_type_t append_name(const char *name) = 0;
+  virtual char *get_name(name_type_t name_index) = 0;
 };
 
 template <uint64_t max_name_len, uint64_t max_name_amount>
 class NameLookup : public NameLookupInterface {
 private:
   char names[max_name_amount][max_name_len] = {0};
+  uint64_t last_name_index = NAME_END;
 
 public:
-  void set_name(uint64_t name_index, const char *name) override;
-  char *get_name(uint64_t name_index) override;
+  void set_name(name_type_t name_index, const char *name) override;
+  name_type_t append_name(const char *name) override;
+  char *get_name(uint8_t name_index) override;
 };
 
 template <uint64_t max_name_len, uint64_t max_name_amount>
-void NameLookup<max_name_len, max_name_amount>::set_name(uint64_t name_index,
+void NameLookup<max_name_len, max_name_amount>::set_name(name_type_t name_index,
                                                          const char *name) {
   strncpy(this->names[name_index], name, max_name_len - 1);
 }
 
 template <uint64_t max_name_len, uint64_t max_name_amount>
-char *NameLookup<max_name_len, max_name_amount>::get_name(uint64_t name_index) {
+name_type_t
+NameLookup<max_name_len, max_name_amount>::append_name(const char *name) {
+  this->set_name(this->last_name_index, name);
+  this->last_name_index += 1;
+  return this->last_name_index - 1;
+}
+
+template <uint64_t max_name_len, uint64_t max_name_amount>
+char *
+NameLookup<max_name_len, max_name_amount>::get_name(name_type_t name_index) {
   return this->names[name_index];
 }
 

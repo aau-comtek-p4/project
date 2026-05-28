@@ -15,6 +15,8 @@ FWriteLogger::FWriteLogger(LogSerializerInterface *serializer) {
   this->serializer = serializer;
 }
 void FWriteLogger::log_entry(LogEntry log_entry) noexcept {
+  log_entry.log_count = this->log_count;
+  this->log_count += 1;
   uint64_t bytes_written =
       this->serializer->serialize(this->log_buf, MAX_LOG_SIZE, log_entry);
 

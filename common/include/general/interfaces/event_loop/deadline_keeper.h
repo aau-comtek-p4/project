@@ -11,7 +11,6 @@
 
 #define DEADLINE_TAG "DEADLINE"
 #define DEADLINE_ERROR_TAG "DEADLINE ERROR"
-#define DEADLINE_LOGGING 0
 
 struct Deadline {
   std::coroutine_handle<> handle;

@@ -29,7 +29,6 @@ std::expected<void, ErrorWrapper>
 DeadlineMinHeap::add_deadline(std::coroutine_handle<> handle,
                               uint64_t time_ms) {
   if (this->element_amount >= this->buffer_size) {
-    printf("Deadline full\n");
     return std::unexpected(
         ErrorWrapper{.error = CapacityError::INSUFFICIENT_SPACE,
                      .tag = ErrorWrapper::CUSTOM});

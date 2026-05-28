@@ -12,8 +12,6 @@ Task<int> timeout_routine() {
     co_return 0;
   }
   if (self_ctxt->io_address) {
-    program_ctxt->io->cancel(self_ctxt->io_address->io_method,
-                             self_ctxt->io_address);
   }
 
   co_return 0;

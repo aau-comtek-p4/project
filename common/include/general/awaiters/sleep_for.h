@@ -27,8 +27,6 @@ struct SkipAwaiter {
 
     sleeper.handle.promise().ctxt.parent_ctxt = &h.promise().ctxt;
 
-    sleeper.handle.promise().ctxt.trace.add_time(this->sleep_time_ms *
-                                                 NS_PR_MS);
     sleeper.handle.promise().ctxt.trace.parent_id =
         sleeper.handle.promise().ctxt.parent_ctxt->trace.id;
     auto res = spawn_future(std::move(sleeper), this->sleep_time_ms);

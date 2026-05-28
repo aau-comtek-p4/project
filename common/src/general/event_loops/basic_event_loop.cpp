@@ -11,6 +11,7 @@
 #include <coroutine>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <expected>
 #include <optional>
 #include <utility>
@@ -40,13 +41,23 @@ BasicEventLoop::enque_future(std::coroutine_handle<> handle, uint64_t time_ms) {
   return std::unexpected(res.error());
 }
 
+uint64_t loop_count = 0;
 std::expected<void, ErrorWrapper> BasicEventLoop::run_step() {
   std::expected<std::coroutine_handle<>, ErrorWrapper> get_head_handle_res;
+  loop_count += 1;
   uint64_t log_budget = 2 * NS_PR_MS;
   uint64_t loop_start = program_ctxt->clock->rt_since_start_ns();
   uint64_t ops = 0;
+  uint64_t pre_time = 0;
+  uint64_t cur_time = 0;
   auto _ = program_ctxt->deadline_tracker->enforce_deadlines();
+
+  uint64_t io_process_start1 = program_ctxt->clock->rt_since_start_ns();
   program_ctxt->io->process_all(0);
+  uint64_t io_process_end1 = program_ctxt->clock->rt_since_start_ns();
+  program_ctxt->metrics->document_statistics_metric_metric(
+      StatMetricType::METRIC_IO_PROCESSING,
+      io_process_end1 - io_process_start1);
   do {
     get_head_handle_res = this->general_queue->deque();
     if (!get_head_handle_res.has_value()) {
@@ -55,7 +66,12 @@ std::expected<void, ErrorWrapper> BasicEventLoop::run_step() {
     std::coroutine_handle<> handler = get_head_handle_res.value();
     if (handler) {
       if (!handler.done()) {
+        pre_time = program_ctxt->clock->rt_since_start_ns();
         handler.resume();
+        cur_time = program_ctxt->clock->rt_since_start_ns();
+        program_ctxt->metrics->document_statistics_metric_metric(
+            StatMetricType::METRIC_COROUTINE_RESUME, cur_time - pre_time);
+        pre_time = cur_time;
         ops += 1;
       }
     }
@@ -68,8 +84,6 @@ std::expected<void, ErrorWrapper> BasicEventLoop::run_step() {
   program_ctxt->metrics->document_statistics_metric_metric(
       StatMetricType::METRIC_LOOP_OP_TIME, op_end - loop_start);
 
-  program_ctxt->io->submit_all();
-
   std::optional<uint64_t> smallest_deadline =
       program_ctxt->deadline_tracker->get_smallest_deadline_ns();
 
@@ -81,7 +95,7 @@ std::expected<void, ErrorWrapper> BasicEventLoop::run_step() {
     if (smallest_deadline.value() < now) {
       program_ctxt->metrics->document_statistics_metric_metric(
           StatMetricType::METRIC_SURPASSED_DEADLINE,
-          op_end - smallest_deadline.value());
+          now - smallest_deadline.value());
       io_timeout = 0;
     } else {
       program_ctxt->metrics->document_statistics_metric_metric(
@@ -91,7 +105,11 @@ std::expected<void, ErrorWrapper> BasicEventLoop::run_step() {
     }
   }
   io_timeout = std::min(io_timeout, (uint64_t)(2 * NS_PR_MS));
+  uint64_t io_process_start = program_ctxt->clock->rt_since_start_ns();
   program_ctxt->io->process_all(io_timeout);
+  uint64_t io_process_end = program_ctxt->clock->rt_since_start_ns();
+  program_ctxt->metrics->document_statistics_metric_metric(
+      StatMetricType::METRIC_IO_PROCESSING, io_process_end - io_process_start);
 
   uint64_t loop_end = program_ctxt->clock->rt_since_start_ns();
   program_ctxt->metrics->document_statistics_metric_metric(

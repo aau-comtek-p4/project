@@ -4,6 +4,7 @@
 #include <cstdint>
 inline bool wifi_initialized = false;
 void start_wifi_innit(void);
+void self_esp_now_innit();
 void initialize_wifi_station(uint8_t *wifi_ssid, uint8_t *wifi_password);
 
 #endif

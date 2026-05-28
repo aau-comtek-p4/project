@@ -11,7 +11,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-void Trace::add_time(uint64_t time_ns) { this->duration_ns += time_ns; }
 void Trace::add_actual_time(uint64_t time_ns) {
   this->actual_duration_ns += time_ns;
 }
@@ -27,17 +26,13 @@ void Trace::suspend_trace(bool debug) {
   if (this->started) {
     uint64_t additional_time =
         program_ctxt->clock->rt_since_start_ns() - this->last_suspend_ns;
-    if (debug) {
-      /*
-program_ctxt->logger->log_entry(
-    logging::log_coroutine_suspended(this->name_id, additional_time));
-        */
-
+    if (debug && COROUTINE_LOGGING) {
+      program_ctxt->logger->log_entry(
+          logging::log_coroutine_suspended(this->name_id, additional_time));
       program_ctxt->metrics->document_statistics_metric_metric(
           StatMetricType::METRIC_SUSPEND_TIME, additional_time);
     }
 
-    this->duration_ns += additional_time;
     this->actual_duration_ns += additional_time;
   }
 }
@@ -59,8 +54,7 @@ void left_pad(char *buf, char symbol, uint64_t amount, uint64_t start) {
 }
 void Trace::print() {
   if (TRACE_LOGGING) {
-    program_ctxt->logger->log_entry(
-        logging::log_trace_print(this->name_id, this->id, this->parent_id,
-                                 this->duration_ns, this->actual_duration_ns));
+    program_ctxt->logger->log_entry(logging::log_trace_print(
+        this->name_id, this->id, this->parent_id, this->actual_duration_ns));
   }
 }

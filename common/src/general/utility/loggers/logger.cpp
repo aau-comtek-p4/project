@@ -76,6 +76,7 @@ LogLevel get_severity(LogReason reason) {
   case LogReason::REASON_TRACE_PRINT:
   case LogReason::LOG_STAT_METRIC:
   case LogReason::LOG_METRIC:
+  case LogReason::REASON_BACKTRACE:
     return LogLevel::LOG_INFO;
 
     // WARNING
@@ -101,8 +102,8 @@ LogEntry initialize_log_header(LogReason reason) {
   entry.timestamp = program_ctxt->clock->rt_since_start_ns();
   entry.reason = reason;
   entry.severity = get_severity(entry.reason);
-  entry.log_count = log_count;
-  log_count += 1;
+  entry.device_type = device_type;
+  entry.device_id = device_id;
   return entry;
 }
 
@@ -233,7 +234,7 @@ LogEntry logging::log_io_complete(IOMethod io_method, IOType io_type,
 LogEntry logging::log_io_error(IOMethod io_method, IOType io_type,
                                uint64_t name_index, uint64_t parent_name_index,
                                uint64_t trace_index, uint64_t err_no) {
-  LogEntry entry = initialize_log_header(LogReason::REASON_IO_COMPLETED);
+  LogEntry entry = initialize_log_header(LogReason::REASON_IO_ERROR);
 
   entry.payload.io_error.parent_name_index = parent_name_index;
   entry.payload.io_error.method = io_method;
@@ -271,14 +272,13 @@ LogEntry logging::log_shutdown(ErrorWrapper error_wrapper) {
 }
 
 LogEntry logging::log_trace_print(uint64_t name_id, uint64_t trace_id,
-                                  uint64_t parent_id, uint64_t duration_ns,
+                                  uint64_t parent_id,
                                   uint64_t actual_duration_ns) {
   LogEntry entry = initialize_log_header(LogReason::REASON_TRACE_PRINT);
 
   entry.payload.trace_print.name_id = name_id;
   entry.payload.trace_print.trace_id = trace_id;
   entry.payload.trace_print.parent_id = parent_id;
-  entry.payload.trace_print.duration_ns = duration_ns;
   entry.payload.trace_print.actual_duration_ns = actual_duration_ns;
   return entry;
 }
@@ -304,6 +304,11 @@ LogEntry logging::log_metric(MetricType metric_type, uint64_t count) {
 
   entry.payload.log_metric.metric_type = metric_type;
   entry.payload.log_metric.count = count;
+  return entry;
+}
+LogEntry logging::log_backtrace(char *mem_addr) {
+  LogEntry entry = initialize_log_header(LogReason::REASON_BACKTRACE);
+  strncpy(entry.payload.log_backtrace.mem_addr, mem_addr, 32);
   return entry;
 }
 const char *parse_log_level(LogLevel log_level) {
@@ -363,15 +368,18 @@ const char *parse_reason(LogReason reason) {
     return "stat_metric";
   case LogReason::LOG_METRIC:
     return "metric";
+  case LogReason::REASON_BACKTRACE:
+    return "backtrace";
   }
   return "io_unkown";
 }
 uint64_t serializer_helper(char *buf, uint64_t max_entry, LogEntry log_entry) {
   return snprintf(buf, max_entry,
-                  "{\"ts\":%" PRIu64 ",\"count\":%" PRIu64
-                  ",\"serverity\":\"%s\",\"reason\":\"%s\",\"payload\":{",
-                  log_entry.timestamp, log_entry.log_count,
-                  parse_log_level(log_entry.severity),
+                  "{\"ts\":%" PRIu64 ",\"count\":%" PRIu32 ",\"ID\":%" PRIu8
+                  ",\"type\":%" PRIu8
+                  ",\"severity\":\"%s\",\"reason\":\"%s\",\"payload\":{",
+                  log_entry.timestamp, log_entry.log_count, log_entry.device_id,
+                  log_entry.device_type, parse_log_level(log_entry.severity),
                   parse_reason(log_entry.reason));
 }
 uint64_t JsonLogSerializer::serialize(char *buf, uint64_t max_entry,
@@ -410,7 +418,7 @@ uint64_t JsonLogSerializer::serialize(char *buf, uint64_t max_entry,
     return snprintf(buf + header_size, max_entry - header_size,
                     "\"type\":\"%s\",\"method\":\"%s\",\"name\":\"%s\","
                     "\"caller\":\"%s\","
-                    "\"trace\":%" PRIu64 ",\"errono\":%" PRIi32 " }}\n",
+                    "\"trace\":%" PRIu64 ",\"errno\":%" PRIi32 " }}\n",
                     parse_io_type(log_entry.payload.io_error.type),
                     parse_io_method(log_entry.payload.io_error.method),
                     program_ctxt->name_lookup->get_name(
@@ -515,6 +523,11 @@ uint64_t JsonLogSerializer::serialize(char *buf, uint64_t max_entry,
     return snprintf(buf + header_size, max_entry - header_size,
                     "\"msg\":\"%s\"}}\n", log_entry.payload.debug.debug) +
            header_size;
+  case LogReason::REASON_BACKTRACE:
+    return snprintf(buf + header_size, max_entry - header_size,
+                    "\"addr\":\"%s\"}}\n",
+                    log_entry.payload.log_backtrace.mem_addr) +
+           header_size;
 
   case LogReason::REASON_SHUTDOWN:
     return snprintf(buf + header_size, max_entry - header_size,
@@ -525,13 +538,11 @@ uint64_t JsonLogSerializer::serialize(char *buf, uint64_t max_entry,
   case LogReason::REASON_TRACE_PRINT:
     return snprintf(buf + header_size, max_entry - header_size,
                     "\"name\":\"%s\",\"id\":%" PRIu64 ",\"parent_id\":%" PRIu64
-                    ",\"duration_ns\":%" PRIu64 ",\"actual_ns\":%" PRIu64
-                    "}}\n",
+                    ",\"actual_ns\":%" PRIu64 "}}\n",
                     program_ctxt->name_lookup->get_name(
                         log_entry.payload.trace_print.name_id),
                     log_entry.payload.trace_print.trace_id,
                     log_entry.payload.trace_print.parent_id,
-                    log_entry.payload.trace_print.duration_ns,
                     log_entry.payload.trace_print.actual_duration_ns) +
            header_size;
   case LogReason::REASON_DROPPED_LOGS:

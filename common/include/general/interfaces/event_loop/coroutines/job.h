@@ -83,6 +83,20 @@ struct Job::promise_type : public shared_promise_type {
     ErrorWrapper error =
         ErrorWrapper{.error = errno, .tag = ErrorWrapper::ERRNO};
     safe_shutdown(error);
+    try {
+      std::rethrow_exception(std::current_exception());
+    } catch (const std::system_error &e) {
+      ErrorWrapper error{.error = e.code().value(), .tag = ErrorWrapper::ERRNO};
+      safe_shutdown(error);
+    } catch (const std::exception &e) {
+      // log e.what() here
+      // fprintf(stderr, "%s\n", e.what());
+      ErrorWrapper error = ErrorWrapper{.error = 2, .tag = ErrorWrapper::ERRNO};
+      safe_shutdown(error);
+    } catch (...) {
+      ErrorWrapper error = ErrorWrapper{.error = 2, .tag = ErrorWrapper::ERRNO};
+      safe_shutdown(error);
+    }
   }
 
   std::suspend_always initial_suspend() { return {}; }

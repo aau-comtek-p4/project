@@ -10,11 +10,16 @@ enum CtxtClockType {
   SIM_CLOCK,
 };
 enum CtxtLoggerType {
-  FILE_LOGGER,
+  SECOND_PROCESS_LOGGER,
   FWRITE_LOGGER,
+  ESP_ASYNC_QUEUE_LOGGER,
+
   DUMMY_LOGGER,
+  /* Deprecated
+  FILE_LOGGER,
   ESP_LOGGER,
   ESP_QUEUE_LOGGER,
+  */
 };
 enum CtxtLoggerSerializer {
   JSON_SERIALIZER,
@@ -61,6 +66,7 @@ struct ProgramContext {
   AllocatorInterface *buffer_allocator = nullptr;
   DeadlineStorageInterface *deadline_tracker = nullptr;
   IOHandler *io = nullptr;
+  IOConnectionHandler *connection_handler = nullptr;
   MetricsInterface *metrics = nullptr;
   RandomInterface *random = nullptr;
 };
